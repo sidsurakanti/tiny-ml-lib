@@ -1,6 +1,6 @@
 # Overview
 
-A lite machine learning framework built from scratch using NumPy with functionality for core components like CNN and MLPs.
+A lite deep learning framework built from scratch using NumPy with functionality for core components like CNN and MLPs.
 
 ## Features
 
@@ -19,6 +19,7 @@ A lite machine learning framework built from scratch using NumPy with functional
 ## Usage
 Convolutional NN  on MNIST
 ```bash
+>>> py main.py
 Input shape: (60000, 784)
 Labels shape: (60000,)
 Model(
@@ -42,13 +43,13 @@ Time spent training: 437.89s
 EVALUATING...
 Sample labels: [9 2 9 8 9 7 1 2 4 3]
 Sample preds: [9 2 9 8 9 7 1 2 4 3]
-Accuracy: 97.52%
+Accuracy: 98.32%
 
 Save weights? (y/n) >>> y
 File name? (empty for default) >>> cnn-weights
 Saved model weights to cnn-weights.pkl
 ```
-...again with MaxPool
+With MaxPool (didn't bother running for longer than 5 epochs cus it's slow asf)
 ```bash
 Model(
   [0] Conv2d       ((1, 28, 28) → (5, 24, 24))
@@ -78,6 +79,7 @@ Accuracy: 87.67%
 
 MLP on MNIST
 ```bash
+>>> py main.py
 Input shape: (60000, 784)
 Labels shape: (60000,)
 Model(
@@ -107,6 +109,9 @@ Save weights? (y/n) >>> y
 File name? (empty for default) >>> mlp-weights
 Saved model weights to mlp-weights.pkl
 ```
+
+With pretrained weights: 
+
 ```bash
 Loaded model weights from mlp-weights.pkl
 
@@ -137,6 +142,7 @@ Accuracy: 98.13%
 
 - Python 3.8+
 - pip
+- Cuda Toolkit (optional)
 
 ### Installation
 
@@ -150,7 +156,7 @@ cd repo
 Create a virtual environment (optional but recommended):
 
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # windows: venv\Scripts\activate
 ```
 
@@ -178,8 +184,8 @@ python main.py
 - [x] Add Conv2d
 - [x] Add pooling layer
 - [x] Add weight inits
-- [ ] Implement cuda 
-- [ ] C++ remake
+- [ ] Add more activations etc
+- [ ] Cuda remake
 
 ## Support
 

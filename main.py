@@ -1,4 +1,5 @@
 from linear import Linear
+from relu import ReLU
 import pandas as pd 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,11 +22,22 @@ plt.imshow(X_train[:, np.random.randint(m)].reshape((28, 28)))
 
 def main():
   fc = Linear(n, 10)
+  a = ReLU(10, 10)
   print(fc)
+  print(a)
+
   out = fc.forward(X_train)
   print(out.shape)
-  dW = fc.backwards(X_train, out)
+  out = a(out)
+  print(out.shape)
+  
+  dA = a.backwards(1)
+  print(dA.shape)
+  dW = fc.backwards(dA)
   print(dW.shape)
+  # print(np.unique(dW, axis=1))
+  # print(np.min(dW), np.max(dW))
+  # print(np.ptp(dW))
 
 if __name__ == "__main__":
   main()

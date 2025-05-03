@@ -19,11 +19,12 @@ class Linear:
     output =  self.weights @ self.X + self.biases
     return output
 
-  def backwards(self, dZ: Array) -> Array:
+  def backwards(self, dZ: Array) -> tuple[Array, Array]:
     m = self.X.shape[1]
     # dOut/dIn
-    dW = dZ @ self.X.T / m 
-    return dW
+    dW = dZ @ self.X.T / m # (10, m) * (m, 784) -> (10, 784)
+    db = np.sum(dZ, axis=1, keepdims=True) / m # (10, m) -> (10, 1)
+    return dW, db
 
   def __repr__(self) -> str:
     return f"<Linear: {self.inputs} -> {self.outputs}>"

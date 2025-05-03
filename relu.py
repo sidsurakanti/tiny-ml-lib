@@ -9,7 +9,7 @@ class ReLU:
     self.out = None
 
   def __call__(self, X: Array) -> Array:
-    self.out = np.maximum(0, X)
+    self.out = np.maximum(0, X) # (n, m)
     return self.out 
 
   def backwards(self, dZ: Array) -> Array:

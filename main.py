@@ -3,6 +3,7 @@ from relu import ReLU
 import pandas as pd 
 import numpy as np
 import matplotlib.pyplot as plt
+from losses import CrossEntropyLoss
 
 # MNIST
 # just download mnist into /dataset/* and change file names to match
@@ -23,21 +24,33 @@ plt.imshow(X_train[:, np.random.randint(m)].reshape((28, 28)))
 def main():
   fc = Linear(n, 10) # (10, 784) * (784, m) -> (10, m) 
   a = ReLU(10, 10) # output-> (10, m)
+  fc2 = Linear(10, 10)
+  loss_fn = CrossEntropyLoss()
   print("\nARCHITECTURE:")
   print(fc)
   print(a)
+  print(fc2)
+  print(loss_fn)
 
   print("\nFORWARD PASS")
   out = fc.forward(X_train) 
   print("FC output:", out.shape)
   out = a(out)
   print("Activation output:", out.shape)
+  out = fc2.forward(out)
+  print("FC2 output:", out.shape)
+  loss = loss_fn.loss(out, y_train)
+  print("Loss:", loss)
   
   print("\nBACKWARDS PASS")
-  dA = a.backwards(1)
+  dA2 = loss_fn.backwards()
+  print("Loss grads:", dA2.shape)
+  dZ2 = fc2.backwards(dA2)
+  print("FC2 grads:", fc2.dW.shape, fc2.db.shape)
+  dA = a.backwards(dZ2)
   print("Activation grads:", dA.shape)
-  dW, db = fc.backwards(dA)
-  print("FC grads:", dW.shape, db.shape)
+  dZ = fc.backwards(dA)
+  print("FC grads:", fc.dW.shape, fc.db.shape)
   # print(np.unique(dW, axis=1))
   # print(np.min(dW), np.max(dW))
   # print(np.ptp(dW))

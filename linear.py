@@ -1,8 +1,8 @@
 import numpy as np
 from defs import Array
+from layer import Layer
 
-
-class Linear:
+class Linear(Layer):
   # TODO: He init, Xavier init, etc
   def __init__(self, inputs: int, outputs: int) -> None:
     self.inputs = inputs
@@ -10,7 +10,7 @@ class Linear:
     self.size = (inputs, outputs)
     # init weights and biases
     self.weights = np.random.randn(self.outputs, self.inputs)
-    self.biases = np.zeros((self.outputs, 1))
+    self.biases = np.random.randn(self.outputs, 1)
 
     # forward pass
     self.X = None
@@ -32,6 +32,15 @@ class Linear:
     self.db = np.sum(dZ, axis=1, keepdims=True) / m # (outputs, m) -> (outputs, 1)
     dX = self.weights.T @ dZ 
     return dX
+  
+  def step(self, learning_rate: float = 0.01) -> None:
+    # update weights and biases
+    self.weights -= learning_rate * self.dW
+    self.biases -= learning_rate * self.db
+    # reset gradients
+    self.dW = None
+    self.db = None
+    return
 
   def __repr__(self) -> str:
     return f"<Linear: {self.inputs} -> {self.outputs}>"

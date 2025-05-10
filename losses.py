@@ -10,7 +10,7 @@ def one_hot(c: int, mat: Array):
 def softmax(logits):
   h = np.max(logits, axis=0, keepdims=1)
   exp = np.exp(logits - h)
-  probs = exp / np.sum(exp)
+  probs = exp / np.sum(exp, axis=0, keepdims=1)
   return probs
    
 class CrossEntropyLoss:
@@ -31,7 +31,8 @@ class CrossEntropyLoss:
 
   def backwards(self):
     # (y_i - t_i) / m
-    return (self.probs - self.targets) / self.targets.shape[1]
+    dZ = (self.probs - self.targets)  
+    return dZ
 
   def __call__(self, *args, **kwds):
     return self.loss(*args)       

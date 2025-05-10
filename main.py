@@ -1,3 +1,5 @@
+from model import Model
+from defs import Sequence, Array
 from linear import Linear
 from relu import ReLU
 import pandas as pd 
@@ -32,28 +34,32 @@ def main():
   print(fc2)
   print(loss_fn)
 
-  print("\nFORWARD PASS")
-  out = fc.forward(X_train) 
-  print("FC output:", out.shape)
-  out = a(out)
-  print("Activation output:", out.shape)
-  out = fc2.forward(out)
-  print("FC2 output:", out.shape)
-  loss = loss_fn.loss(out, y_train)
-  print("Loss:", loss)
+  # print("\nFORWARD PASS")
+  # out = fc.forward(X_train) 
+  # print("FC output:", out.shape)
+  # out = a.forward(out)
+  # print("Activation output:", out.shape)
+  # out = fc2.forward(out)
+  # print("FC2 output:", out.shape)
+  # loss = loss_fn.loss(out, y_train)
+  # print("Loss:", loss)
   
-  print("\nBACKWARDS PASS")
-  dA2 = loss_fn.backwards()
-  print("Loss grads:", dA2.shape)
-  dZ2 = fc2.backwards(dA2)
-  print("FC2 grads:", fc2.dW.shape, fc2.db.shape)
-  dA = a.backwards(dZ2)
-  print("Activation grads:", dA.shape)
-  dZ = fc.backwards(dA)
-  print("FC grads:", fc.dW.shape, fc.db.shape)
-  # print(np.unique(dW, axis=1))
-  # print(np.min(dW), np.max(dW))
-  # print(np.ptp(dW))
+  # print("\nBACKWARDS PASS")
+  # dA2 = loss_fn.backwards()
+  # print("Loss grads:", dA2.shape)
+  # dZ2 = fc2.backwards(dA2)
+  # print("FC2 grads:", fc2.dW.shape, fc2.db.shape)
+  # dA = a.backwards(dZ2)
+  # print("Activation grads:", dA.shape)
+  # dZ = fc.backwards(dA)
+  # print("FC grads:", fc.dW.shape, fc.db.shape)
+  # # print(np.unique(dW, axis=1))
+  # # print(np.min(dW), np.max(dW))
+  # # print(np.ptp(dW))
+
+
+  model = Model([fc, a, fc2], loss_fn)
+  model(1000, X_train, y_train)
 
 if __name__ == "__main__":
   main()

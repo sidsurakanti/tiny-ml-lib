@@ -19,7 +19,7 @@ y_test, X_test = test[0], test[1:] / 255
 y_train, X_train = train[0], train[1:] / 255
 n, m = X_train.shape
 print("Input shape:", X_train.shape)
-print("Output shape:", y_train.shape)
+print("Labels shape:", y_train.shape)
 
 plt.imshow(X_train[:, np.random.randint(m)].reshape((28, 28)))
 # plt.savefig("eg.png")
@@ -58,9 +58,26 @@ def main():
   # # print(np.min(dW), np.max(dW))
   # # print(np.ptp(dW))
 
+  sequence = [
+        Linear(784, 128),
+        ReLU(128, 128),
+        Linear(128, 64),
+        ReLU(64, 64),
+        Linear(64, 10)
+      ]
+
 
   model = Model([fc, a, fc2], loss_fn)
-  model(2, X_train, y_train, batch_size=512)
+  # model = Model(sequence, loss_fn)
+
+  print("TRAINING")
+  model(50, X_train, y_train, batch_size=128)
+
+  print("EVALUATING")
+  acc = model.evaluate(X_test, y_test)
+  print(f"Accuracy: {acc*100:.2f}%")
+
+
 
 if __name__ == "__main__":
   main()

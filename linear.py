@@ -33,7 +33,7 @@ class Linear(Layer):
     dX = self.weights.T @ dZ 
     return dX
   
-  def step(self, learning_rate: float = 0.01) -> None:
+  def step(self, learning_rate: float = 0.1) -> None:
     # update weights and biases
     self.weights -= learning_rate * self.dW
     self.biases -= learning_rate * self.db

@@ -1,3 +1,4 @@
+import math
 class Batcher:
   def __init__(self, data: tuple, batch_size: int = 0):
     self.data = data
@@ -6,7 +7,7 @@ class Batcher:
     self.index = 0
 
   def __len__(self):
-    return self.y.shape[0] // self.batch_size
+    return math.ceil(self.y.shape[0] / self.batch_size)
 
   def __iter__(self):
     return self
@@ -18,4 +19,4 @@ class Batcher:
     x = self.x[:,self.index:self.index + self.batch_size + 1]
     y = self.y[self.index:self.index + self.batch_size + 1]
     self.index += min(self.batch_size, self.y.shape[0] - self.index)
-    return self.index, (x, y)
+    return (x, y)

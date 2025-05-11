@@ -19,6 +19,7 @@ y_test, X_test = test[0], test[1:] / 255
 y_train, X_train = train[0], train[1:] / 255
 n, m = X_train.shape
 print("Input shape:", X_train.shape)
+print("Output shape:", y_train.shape)
 
 plt.imshow(X_train[:, np.random.randint(m)].reshape((28, 28)))
 # plt.savefig("eg.png")
@@ -32,7 +33,7 @@ def main():
   print(fc)
   print(a)
   print(fc2)
-  print(loss_fn)
+  print(loss_fn, "\n") 
 
   # print("\nFORWARD PASS")
   # out = fc.forward(X_train) 
@@ -59,7 +60,7 @@ def main():
 
 
   model = Model([fc, a, fc2], loss_fn)
-  model(1000, X_train, y_train)
+  model(2, X_train, y_train, batch_size=512)
 
 if __name__ == "__main__":
   main()

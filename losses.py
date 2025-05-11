@@ -38,7 +38,7 @@ class CrossEntropyLoss:
     return self.loss(*args)       
   
   def __repr__(self) -> str:
-    return f"<CrossEntropyLoss >"
+    return f"<CrossEntropyLoss>"
 
 if __name__ == "__main__":
   truth = np.array([3, 5, 6, 9])

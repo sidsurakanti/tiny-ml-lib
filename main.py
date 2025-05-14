@@ -31,11 +31,12 @@ def main():
 
   loss_fn = CrossEntropyLoss()
   # loss_fn = MSELoss()
-  print("\nARCHITECTURE:")
-  print(fc)
-  print(a)
-  print(fc2)
-  print(loss_fn, "\n") 
+
+  # print("\nARCHITECTURE:")
+  # print(fc)
+  # print(a)
+  # print(fc2)
+  # print(loss_fn, "\n") 
 
   # print("\nFORWARD PASS")
   # out = fc.forward(X_train) 
@@ -68,14 +69,18 @@ def main():
         Linear(64, 10)
       ]
 
+  print("\nARCHITECTURE:")
+  for layer in sequence:
+    print(layer)
+  print(loss_fn)
 
   # model = Model([fc, a, fc2], loss_fn)
   model = Model(sequence, loss_fn)
 
-  print("TRAINING")
+  print("\nTRAINING")
   model(50, X_train, y_train, batch_size=128)
 
-  print("EVALUATING")
+  print("\nEVALUATING")
   acc = model.evaluate(X_test, y_test)
   print(f"Accuracy: {acc*100:.2f}%")
 

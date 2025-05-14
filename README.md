@@ -10,10 +10,43 @@ A minimal neural network library built from scratch using NumPy. Designed for le
 - Model & sequential classes
 - Data mini-batching
 
+```bash
+Input shape: (784, 60000)
+Labels shape: (60000,)
+
+ARCHITECTURE:
+<Linear: 784 -> 128>
+<ReLU: 128 -> 128>
+<Linear: 128 -> 64>
+<ReLU: 64 -> 64>
+<Linear: 64 -> 10>
+<CrossEntropyLoss>
+
+TRAINING
+EPOCH 1/50, Loss: 2.3107107
+EPOCH 2/50, Loss: 2.5198198
+EPOCH 3/50, Loss: 2.4785785
+EPOCH 4/50, Loss: 2.2003003
+EPOCH 5/50, Loss: 1.8099099
+EPOCH 6/50, Loss: 1.5367367
+EPOCH 7/50, Loss: 1.5029029
+EPOCH 8/50, Loss: 1.3987987
+EPOCH 9/50, Loss: 1.1766766
+EPOCH 10/50, Loss: 1.145050
+...
+EPOCH 50/50, Loss: 0.372323
+
+EVALUATING
+Sample preds: [3 0 4 1 9 2 1 3 1 4]
+Sample labels: [5 0 4 1 9 2 1 3 1 4]
+Accuracy: 89.47%
+```
+
 ## Why make this?
 
 - I wanted to learn more about ml libraries and how they work under the hood
 - Wanted to experiment with a framework and learn cool stuff
+
 
 ## Stack
 

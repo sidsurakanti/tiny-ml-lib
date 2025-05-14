@@ -5,7 +5,7 @@ from relu import ReLU
 import pandas as pd 
 import numpy as np
 import matplotlib.pyplot as plt
-from losses import CrossEntropyLoss
+from losses import CrossEntropyLoss, MSELoss
 
 # MNIST
 # just download mnist into /dataset/* and change file names to match
@@ -28,7 +28,9 @@ def main():
   fc = Linear(n, 10) # (10, 784) * (784, m) -> (10, m) 
   a = ReLU(10, 10) # output-> (10, m)
   fc2 = Linear(10, 10)
+
   loss_fn = CrossEntropyLoss()
+  # loss_fn = MSELoss()
   print("\nARCHITECTURE:")
   print(fc)
   print(a)
@@ -67,8 +69,8 @@ def main():
       ]
 
 
-  model = Model([fc, a, fc2], loss_fn)
-  # model = Model(sequence, loss_fn)
+  # model = Model([fc, a, fc2], loss_fn)
+  model = Model(sequence, loss_fn)
 
   print("TRAINING")
   model(50, X_train, y_train, batch_size=128)
@@ -76,7 +78,6 @@ def main():
   print("EVALUATING")
   acc = model.evaluate(X_test, y_test)
   print(f"Accuracy: {acc*100:.2f}%")
-
 
 
 if __name__ == "__main__":

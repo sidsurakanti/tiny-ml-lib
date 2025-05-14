@@ -29,7 +29,7 @@ class Model:
   def fit(self, epochs: int = 5, *args, **kwargs):
     for epoch in range(epochs):
       loss = self.train(*args, **kwargs)
-      print(f"EPOCH {epoch + 1}/{epochs}, Loss: {loss:.4f}\n")
+      print(f"EPOCH {epoch + 1}/{epochs}, Loss: {loss:.4f}")
     return 
 
   def train(self, X: Array, y: Array, batch_size: int = 0):  
@@ -40,7 +40,7 @@ class Model:
       _, loss = self.forward(x, y)
       self.backwards()
       if i % ceil(total_batches / 4) == 0 or i == total_batches:
-        print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}")
+        print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}", end="\r")
 
       # for i in [0, 2]:
         # print("Layer", i)

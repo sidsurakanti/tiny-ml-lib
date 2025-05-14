@@ -13,6 +13,35 @@ def softmax(logits):
   probs = exp / np.sum(exp, axis=0, keepdims=1)
   return probs
    
+class MSELoss:
+  def __init__(self):
+    self.probs = None
+
+  def loss(self, logits, truth):
+    probs = softmax(logits)
+    targets = one_hot(logits.shape[0], truth)
+    m = logits.shape[1]
+
+    # cache it for backprop
+    self.probs = probs 
+    self.targets = targets 
+
+    # sum(y * ln(p)) for p_i in logits 
+    # basically, take ln(prediction) for singular correct class b/c y is != 0
+    return -np.sum((probs-targets)**2)
+
+  def backwards(self):
+    # (y_i - t_i)
+    dZ = 2*(self.probs - self.targets)  
+    return dZ
+
+  def __call__(self, *args, **kwds):
+    return self.loss(*args)       
+  
+  def __repr__(self) -> str:
+    return f"<MSELoss>"
+
+
 class CrossEntropyLoss:
   def __init__(self):
     self.probs = None
@@ -26,11 +55,11 @@ class CrossEntropyLoss:
     self.targets = targets 
 
     # sum(y * ln(p)) for p_i in logits 
-    # basically, take ln(prediction) for singular correct class b/c target is =/= 0
+    # basically, take ln(prediction) for singular correct class b/c y is != 0
     return -np.mean(np.sum(targets * np.log(probs + 1e-9))) / logits.shape[1]
 
   def backwards(self):
-    # (y_i - t_i) / m
+    # (y_i - t_i) 
     dZ = (self.probs - self.targets)  
     return dZ
 

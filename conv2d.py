@@ -34,7 +34,7 @@ class Conv2d(Layer):
       temp = np.copy(self.b)
       for i in range(self.filters):
         for input_channel in range(self.input_channels):
-          # print(X[m, input_channel].shape, "\n", self.W[i, input_channel].shape)
+          print(X[x, input_channel].shape, "\n", self.W[i, input_channel].shape)
           temp[i] += signal.convolve(X[x, input_channel], self.W[i, input_channel], mode="valid")
       self.out[x] = temp
 
@@ -48,7 +48,7 @@ class Conv2d(Layer):
       temp = np.zeros(self.input_shape)
       for i in range(self.filters):
         for channel in range(self.input_channels):
-          print(self.X[x, channel].shape, out_grad[x, i].shape)
+          # print(self.X[x, channel].shape, out_grad[])
           self.dW[i, channel] += signal.correlate(self.X[x, channel], out_grad[x, i], mode="valid")
           temp[channel] += signal.convolve(out_grad[x, i], self.W[i, channel], mode="full")
       dX[x] = temp

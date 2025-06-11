@@ -56,6 +56,7 @@ class CrossEntropyLoss:
 
     # sum(y * ln(p)) for p_i in logits 
     # basically, take ln(prediction) for singular correct class b/c y is != 0
+    print(logits.shape)
     return -np.mean(np.sum(targets * np.log(probs + 1e-9))) / logits.shape[1]
 
   def backwards(self):

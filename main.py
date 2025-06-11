@@ -75,9 +75,10 @@ def main():
 
   sequence = [
         Conv2d((1, 28, 28), 5, 3),
-        ReLU(128, 128),
+        ReLU(),
         Flatten(),
         Linear(26*26*5, 128),
+        # Linear(784, 128),
         ReLU(),
         Linear(128, 64),
         ReLU(),
@@ -94,7 +95,7 @@ def main():
 
   print("\nTRAINING")
   # model(50, X_train, y_train, batch_size=128)
-  model(1, cX_train, y_train, batch_size=128)
+  model(1, cX_train, y_train, batch_size=0)
 
   print("\nEVALUATING")
   acc = model.evaluate(X_test, y_test)

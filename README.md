@@ -41,7 +41,7 @@ EPOCH 50/50, Loss: 0.258080
 EVALUATING
 Sample preds: [5 0 4 1 9 2 1 3 1 4]
 Sample labels: [5 0 4 1 9 2 1 3 1 4]
-Accuracy: 92.90%
+Accuracy: 92.90% 
 ```
 
 ## Why make this?

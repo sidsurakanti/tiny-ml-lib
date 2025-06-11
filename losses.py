@@ -78,3 +78,4 @@ if __name__ == "__main__":
   # print(softmax(logits))
   # print(logits)
   print(loss_fn(logits, truth))
+

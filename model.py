@@ -76,3 +76,4 @@ class Model:
 
   def __call__(self, *args, **kwargs):
     return self.fit(*args, **kwargs)
+

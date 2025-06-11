@@ -1,6 +1,8 @@
 from model import Model
 from defs import Sequence, Array
 from linear import Linear
+from conv2d import Conv2d
+from flatten import Flatten
 from relu import ReLU
 import pandas as pd 
 import numpy as np
@@ -26,8 +28,18 @@ plt.imshow(X_train[:, np.random.randint(m)].reshape((28, 28)))
 
 def main():
   fc = Linear(n, 10) # (10, 784) * (784, m) -> (10, m) 
-  a = ReLU(10, 10) # output-> (10, m)
+  a = ReLU() # output-> (10, m)
   fc2 = Linear(10, 10)
+  # 28 should acc be sqrt(n) but i dont feel like generalizing
+  cX_train = X_train.T.reshape(m, 1, 28, 28)
+  conv2d = Conv2d((1, 28, 28), 5, 3)
+  # print(conv2d)
+  # out = conv2d.forward(cX_train)
+  # print(out.shape)
+  # dz = np.ones_like(out)
+  # dx = conv2d.backwards(dz)  
+  # print(dx.shape)
+  # print(dx[0])
 
   loss_fn = CrossEntropyLoss()
   # loss_fn = MSELoss()
@@ -62,10 +74,13 @@ def main():
   # # print(np.ptp(dW))
 
   sequence = [
-        Linear(784, 128),
+        Conv2d((1, 28, 28), 5, 3),
         ReLU(128, 128),
+        Flatten(),
+        Linear(26*26*5, 128),
+        ReLU(),
         Linear(128, 64),
-        ReLU(64, 64),
+        ReLU(),
         Linear(64, 10)
       ]
 
@@ -78,7 +93,8 @@ def main():
   model = Model(sequence, loss_fn)
 
   print("\nTRAINING")
-  model(50, X_train, y_train, batch_size=128)
+  # model(50, X_train, y_train, batch_size=128)
+  model(1, cX_train, y_train, batch_size=128)
 
   print("\nEVALUATING")
   acc = model.evaluate(X_test, y_test)

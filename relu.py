@@ -5,9 +5,7 @@ from layer import Layer
 
 
 class ReLU(Layer):
-  def __init__(self, inputs: int, outputs: int) -> None:
-    self.inputs = inputs
-    self.outputs = outputs
+  def __init__(self) -> None:
     self.out = None
     self.X = None
 
@@ -20,4 +18,4 @@ class ReLU(Layer):
     return dZ * (self.X > 0).astype(float)
   
   def __repr__(self) -> str:
-    return f"<ReLU: {self.inputs} -> {self.outputs}>"
+    return f"<ReLU>"

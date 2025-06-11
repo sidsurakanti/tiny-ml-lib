@@ -34,12 +34,14 @@ EPOCH 8/50, Loss: 1.3987987
 EPOCH 9/50, Loss: 1.1766766
 EPOCH 10/50, Loss: 1.145050
 ...
-EPOCH 50/50, Loss: 0.372323
+EPOCH 48/50, Loss: 0.268282
+EPOCH 49/50, Loss: 0.259898
+EPOCH 50/50, Loss: 0.258080
 
 EVALUATING
-Sample preds: [3 0 4 1 9 2 1 3 1 4]
+Sample preds: [5 0 4 1 9 2 1 3 1 4]
 Sample labels: [5 0 4 1 9 2 1 3 1 4]
-Accuracy: 89.47%
+Accuracy: 92.90%
 ```
 
 ## Why make this?

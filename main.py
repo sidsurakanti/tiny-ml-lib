@@ -38,7 +38,7 @@ def main():
   fc2 = Linear(10, 10)
 
   # 28 should acc be sqrt(n) but i dont feel like generalizing
-  # conv2d = Conv2d((1, 28, 28), 5, 3)
+  conv2d = Conv2d((1, 28, 28), 5, 3)
 
   # print(conv2d)
   # out = conv2d.forward(cX_train)
@@ -77,7 +77,7 @@ def main():
 
   print("\nTRAINING")
   # model(50, X_train, y_train, batch_size=32)
-  model(15, cX_train, y_train, batch_size=0)
+  model(5, cX_train, y_train, batch_size=32)
 
   print("\nEVALUATING")
   # acc = model.evaluate(X_test, y_test)
@@ -87,28 +87,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-
-
-  # print("\nFORWARD PASS")
-  # out = fc.forward(X_train) 
-  # print("FC output:", out.shape)
-  # out = a.forward(out)
-  # print("Activation output:", out.shape)
-  # out = fc2.forward(out)
-  # print("FC2 output:", out.shape)
-  # loss = loss_fn.loss(out, y_train)
-  # print("Loss:", loss)
-  
-  # print("\nBACKWARDS PASS")
-  # dA2 = loss_fn.backwards()
-  # print("Loss grads:", dA2.shape)
-  # dZ2 = fc2.backwards(dA2)
-  # print("FC2 grads:", fc2.dW.shape, fc2.db.shape)
-  # dA = a.backwards(dZ2)
-  # print("Activation grads:", dA.shape)
-  # dZ = fc.backwards(dA)
-  # print("FC grads:", fc.dW.shape, fc.db.shape)
-  # # print(np.unique(dW, axis=1))
-  # # print(np.min(dW), np.max(dW))
-  # # print(np.ptp(dW))
-

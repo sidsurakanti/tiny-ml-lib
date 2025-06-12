@@ -1,15 +1,46 @@
 # Overview
 
-A minimal neural network library built from scratch using NumPy. Designed for learning and experimentation, this project walks through implementing core ML components (layers, activation functions, loss functions, and training logic) without external ML frameworks.
+A small neural network library built from scratch using NumPy. Designed for learning and experimentation, this project walks through implementing core ML components (layers, activation functions, loss functions, and training logic) without external ML frameworks.
 
 ## Features
 
 - Fully connected layer
+- Convolutional layer
+- Flatten layer
 - ReLU activation
 - Cross Entropy Loss & MSE Loss
 - Model & sequential classes
 - Data mini-batching
 
+## Usage
+Convolutional neural network on MNIST
+```bash
+Input shape: (60000, 784)
+Labels shape: (60000,)
+
+ARCHITECTURE:
+<Conv2D: (1, 28, 28) -> (5, 24, 24)>
+<ReLU>
+<Flatten>
+<Linear: 2880 -> 128>
+<ReLU>
+<Linear: 128 -> 10>
+<CrossEntropyLoss>
+
+TRAINING
+EPOCH 1/5, Loss: 1.64071.6407
+EPOCH 2/5, Loss: 1.12811.1281
+EPOCH 3/5, Loss: 0.69510.6951
+EPOCH 4/5, Loss: 0.57120.5712
+EPOCH 5/5, Loss: 0.33620.3362
+
+EVALUATING
+Sample labels: [6 8 1 9 8 0 8 1 1 2]
+Sample preds: [6 8 1 9 8 0 8 1 1 2]
+Accuracy: 85.07%
+```
+
+MLP on MNIST
 ```bash
 Input shape: (60000, 784)
 Labels shape: (60000,)

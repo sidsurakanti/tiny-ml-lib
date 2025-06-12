@@ -6,8 +6,7 @@ class Flatten(Layer):
         self.old_shape = X.shape
         res = X.reshape(X.shape[0], -1)
         # print(res.shape)
-        # transposed cus im too lazy to go back and fix my old code to work properly w this
-        return res.T
+        return res
 
     def backwards(self, out):
         return out.reshape(self.old_shape)

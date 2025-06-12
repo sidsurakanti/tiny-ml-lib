@@ -49,7 +49,7 @@ class Conv2d(Layer):
   def backwards(self, out_grad):
     m = out_grad.shape[0]
     dX = np.zeros((m, *self.input_shape))
-    print(out_grad[1])
+    # print(out_grad[1])
 
     for i in range(m):
       temp = np.zeros(self.input_shape)
@@ -71,8 +71,8 @@ class Conv2d(Layer):
     # update weights and biases
     self.W -= learning_rate * self.dW
     self.b -= learning_rate * self.db
-    print(np.mean(self.W), np.std(self.W))
-    print(np.mean(self.dW), np.std(self.dW))
+    # print(np.mean(self.W), np.std(self.W))
+    # print(np.mean(self.dW), np.std(self.dW))
     # reset gradients
     self.dW = np.zeros_like(self.W)
     self.db = np.zeros_like(self.b) 

@@ -1,4 +1,5 @@
 import math
+
 class Batcher:
   def __init__(self, data: tuple, batch_size: int = 0):
     self.data = data
@@ -16,7 +17,7 @@ class Batcher:
     if self.index >= self.y.shape[0]:
       raise StopIteration
 
-    x = self.x[:,self.index:self.index + self.batch_size + 1]
-    y = self.y[self.index:self.index + self.batch_size + 1]
+    x = self.x[self.index:self.index + self.batch_size]
+    y = self.y[self.index:self.index + self.batch_size]
     self.index += min(self.batch_size, self.y.shape[0] - self.index)
     return (x, y)

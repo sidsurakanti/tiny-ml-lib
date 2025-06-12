@@ -12,14 +12,17 @@ class Conv2d(Layer):
     self.filter_size = filter_size
     self.stride = stride
     self.padding = padding
+
     self.filter_shape = (filters, input_channels, filter_size, filter_size)
     self.output_shape = (filters, 
                          (input_height - filter_size // stride + 1),
                          (input_width - filter_size // stride + 1))
+
     self.X = None
-    self.W = np.random.randn(*self.filter_shape) * 0.01
-    self.b = np.zeros(self.output_shape)
     self.out = None
+
+    self.W = np.random.randn(*self.filter_shape)
+    self.b = np.zeros(self.output_shape)
     self.dW = np.zeros(self.filter_shape)
     self.db = np.zeros(self.output_shape)
 
@@ -27,31 +30,37 @@ class Conv2d(Layer):
     self.X = X
     m = self.X.shape[0]
     self.out = np.zeros((m, *self.output_shape))
-    print(self.W.shape)
-    print(self.X.shape)
 
-    for x in range(m):
+    # print(self.W.shape)
+    # print(self.X.shape)
+
+    for i in range(m):
       temp = np.copy(self.b)
-      for i in range(self.filters):
-        for input_channel in range(self.input_channels):
-          print(X[x, input_channel].shape, "\n", self.W[i, input_channel].shape)
-          temp[i] += signal.convolve(X[x, input_channel], self.W[i, input_channel], mode="valid")
-      self.out[x] = temp
+
+      for f in range(self.filters):
+        for c in range(self.input_channels):
+          # print(X[i, c].shape, "\n", self.W[f, c].shape)
+          temp[f] += signal.correlate(X[i, c], self.W[f, c], mode="valid")
+
+      self.out[i] = temp
 
     return self.out
 
   def backwards(self, out_grad):
     m = out_grad.shape[0]
     dX = np.zeros((m, *self.input_shape))
-    
-    for x in range(m):
+    print(out_grad[1])
+
+    for i in range(m):
       temp = np.zeros(self.input_shape)
-      for i in range(self.filters):
-        for channel in range(self.input_channels):
-          # print(self.X[x, channel].shape, out_grad[])
-          self.dW[i, channel] += signal.correlate(self.X[x, channel], out_grad[x, i], mode="valid")
-          temp[channel] += signal.convolve(out_grad[x, i], self.W[i, channel], mode="full")
-      dX[x] = temp
+
+      for f in range(self.filters):
+        for c in range(self.input_channels):
+          # print(self.X[i, c].shape, out_grad[])
+          self.dW[f, c] += signal.correlate(self.X[i, c], out_grad[i, f], mode="valid")
+          temp[c] += signal.convolve(out_grad[i, f], self.W[f, c], mode="full")
+
+      dX[i] = temp
 
     self.dW /= m
     self.db = np.sum(out_grad, axis=0) / m
@@ -62,9 +71,11 @@ class Conv2d(Layer):
     # update weights and biases
     self.W -= learning_rate * self.dW
     self.b -= learning_rate * self.db
+    print(np.mean(self.W), np.std(self.W))
+    print(np.mean(self.dW), np.std(self.dW))
     # reset gradients
-    self.dW = None
-    self.db = None
+    self.dW = np.zeros_like(self.W)
+    self.db = np.zeros_like(self.b) 
     return
 
 

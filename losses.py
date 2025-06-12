@@ -1,16 +1,16 @@
 import numpy as np
 from defs import Array
 
-def one_hot(c: int, mat: Array):
-  m = mat.shape[0]
-  arr = np.zeros((c, m))
-  arr[mat, np.arange(m)] = 1 
+def one_hot(classes: int, truth: Array):
+  m = truth.shape[0]
+  arr = np.zeros((m, classes))
+  arr[np.arange(m), truth] = 1 
   return arr
 
 def softmax(logits):
-  h = np.max(logits, axis=0, keepdims=1)
+  h = np.max(logits, axis=1, keepdims=1)
   exp = np.exp(logits - h)
-  probs = exp / np.sum(exp, axis=0, keepdims=1)
+  probs = exp / np.sum(exp, axis=1, keepdims=1)
   return probs
    
 class MSELoss:
@@ -19,8 +19,8 @@ class MSELoss:
 
   def loss(self, logits, truth):
     probs = softmax(logits)
-    targets = one_hot(logits.shape[0], truth)
-    m = logits.shape[1]
+    targets = one_hot(logits.shape[1], truth)
+    m = logits.shape[0]
 
     # cache it for backprop
     self.probs = probs 
@@ -47,17 +47,19 @@ class CrossEntropyLoss:
     self.probs = None
 
   def loss(self, logits, truth):
+    m, n = logits.shape
     probs = softmax(logits)
-    targets = one_hot(logits.shape[0], truth)
+    targets = one_hot(n, truth)
 
     # cache it for backprop
     self.probs = probs 
     self.targets = targets 
 
+    # print(logits.shape, probs.shape, targets.shape)
+
     # sum(y * ln(p)) for p_i in logits 
     # basically, take ln(prediction) for singular correct class b/c y is != 0
-    print(logits.shape)
-    return -np.mean(np.sum(targets * np.log(probs + 1e-9))) / logits.shape[1]
+    return -np.mean(np.sum(targets * np.log(probs + 1e-9))) / n
 
   def backwards(self):
     # (y_i - t_i) 

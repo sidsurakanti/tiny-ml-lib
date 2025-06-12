@@ -11,7 +11,7 @@ A minimal neural network library built from scratch using NumPy. Designed for le
 - Data mini-batching
 
 ```bash
-Input shape: (784, 60000)
+Input shape: (60000, 784)
 Labels shape: (60000,)
 
 ARCHITECTURE:
@@ -23,25 +23,26 @@ ARCHITECTURE:
 <CrossEntropyLoss>
 
 TRAINING
-EPOCH 1/50, Loss: 2.3107107
-EPOCH 2/50, Loss: 2.5198198
-EPOCH 3/50, Loss: 2.4785785
-EPOCH 4/50, Loss: 2.2003003
-EPOCH 5/50, Loss: 1.8099099
-EPOCH 6/50, Loss: 1.5367367
-EPOCH 7/50, Loss: 1.5029029
-EPOCH 8/50, Loss: 1.3987987
-EPOCH 9/50, Loss: 1.1766766
-EPOCH 10/50, Loss: 1.145050
+EPOCH 1/50, Loss: 6.3107107
+EPOCH 2/50, Loss: 5.5198198
+EPOCH 3/50, Loss: 4.4785785
+EPOCH 4/50, Loss: 4.2003003
+EPOCH 5/50, Loss: 3.8099099
+EPOCH 6/50, Loss: 3.5367367
+EPOCH 7/50, Loss: 2.5029029
+EPOCH 8/50, Loss: 2.3987987
+EPOCH 9/50, Loss: 2.1766766
+EPOCH 10/50, Loss: 2.145050
 ...
-EPOCH 48/50, Loss: 0.268282
-EPOCH 49/50, Loss: 0.259898
-EPOCH 50/50, Loss: 0.258080
+EPOCH 47/50, Loss: 0.15611561
+EPOCH 48/50, Loss: 0.17551755
+EPOCH 49/50, Loss: 0.14681468
+EPOCH 50/50, Loss: 0.15551555
 
 EVALUATING
-Sample preds: [5 0 4 1 9 2 1 3 1 4]
-Sample labels: [5 0 4 1 9 2 1 3 1 4]
-Accuracy: 92.90% 
+Sample labels: [1 9 3 8 6 1 4 1 7 5]
+Sample preds: [1 9 3 8 8 1 4 1 7 5]
+Accuracy: 95.09%
 ```
 
 ## Why make this?

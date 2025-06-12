@@ -18,6 +18,7 @@ class Model:
   def backwards(self, *args, **kwargs):
     dZ = self.loss.backwards()
     for layer in reversed(self.sequence):
+      # print(layer.__repr__(), dZ.shape)
       dZ = layer.backwards(dZ)
     return dZ
   
@@ -42,20 +43,18 @@ class Model:
       if i % ceil(total_batches / 4) == 0 or i == total_batches:
         print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}", end="\r")
 
-      # for i in [0, 2]:
-        # print("Layer", i)
-        # print("W:", np.min(self.sequence[i].weights), np.max(self.sequence[i].weights))
-        # print("dW:", np.min(self.sequence[i].dW), np.max(self.sequence[i].dW))
-
       self.step()
     return loss
 
   def evaluate(self, X_test: Array, y_test: Array):
     out, _ = self.forward(X_test, y_test)
-    preds = np.argmax(out, axis=0)
+    preds = np.argmax(out, axis=1)
     correct = np.sum(preds == y_test)
-    print("Sample preds:", preds[:10])
-    print("Sample labels:", y_test[:10])
+    r = np.random.randint(0, preds.shape[0])
+
+    print("Sample labels:", y_test[r:r+10])
+    print("Sample preds:", preds[r:r+10])
+
     total = y_test.shape[0]
     return correct / total
 

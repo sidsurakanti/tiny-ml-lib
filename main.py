@@ -51,22 +51,22 @@ def main():
   loss_fn = CrossEntropyLoss()
   # loss_fn = MSELoss()
 
-  sequence = [
-        Linear(784, 128),
-        ReLU(),
-        Linear(128, 64),
-        ReLU(),
-        Linear(64, 10)
-      ]
-
   # sequence = [
-  #       Conv2d((1, 28, 28), 5, 5),
+  #       Linear(784, 128),
   #       ReLU(),
-  #       Flatten(),
-  #       Linear(24*24*5, 128),
+  #       Linear(128, 64),
   #       ReLU(),
-  #       Linear(128, 10)
+  #       Linear(64, 10)
   #     ]
+
+  sequence = [
+        Conv2d((1, 28, 28), 5, 5),
+        ReLU(),
+        Flatten(),
+        Linear(24*24*5, 128),
+        ReLU(),
+        Linear(128, 10)
+      ]
 
   print("\nARCHITECTURE:")
   for layer in sequence:
@@ -76,12 +76,12 @@ def main():
   model = Model(sequence, loss_fn)
 
   print("\nTRAINING")
-  model(50, X_train, y_train, batch_size=32)
-  # model(15, cX_train, y_train, batch_size=0)
+  # model(50, X_train, y_train, batch_size=32)
+  model(15, cX_train, y_train, batch_size=0)
 
   print("\nEVALUATING")
-  acc = model.evaluate(X_test, y_test)
-  # acc = model.evaluate(cX_test, y_test)
+  # acc = model.evaluate(X_test, y_test)
+  acc = model.evaluate(cX_test, y_test)
   print(f"Accuracy: {acc*100:.2f}%")
 
 

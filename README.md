@@ -1,6 +1,6 @@
 # Overview
 
-A small neural network library built from scratch using NumPy. Designed for learning and experimentation, this project walks through implementing core ML components (layers, activation functions, loss functions, and training logic) without external ML frameworks.
+A small machine learning library built from scratch using NumPy with functionality for core components like CNN and MLPs.
 
 ## Features
 
@@ -10,16 +10,17 @@ A small neural network library built from scratch using NumPy. Designed for lear
 - ReLU activation
 - Cross Entropy Loss & MSE Loss
 - Model & sequential classes
-- Data mini-batching
+- Training & eval loop
+- Mini-batching
 
 ## Usage
-Convolutional neural network on MNIST
+Convolutional NN  on MNIST
 ```bash
 Input shape: (60000, 784)
 Labels shape: (60000,)
 
 ARCHITECTURE:
-<Conv2D: (1, 28, 28) -> (5, 24, 24)>
+<Conv2D: (1, 28, 28) -> (5, 24, 24), Filters: 5, 5x5>
 <ReLU>
 <Flatten>
 <Linear: 2880 -> 128>
@@ -27,17 +28,25 @@ ARCHITECTURE:
 <Linear: 128 -> 10>
 <CrossEntropyLoss>
 
-TRAINING
-EPOCH 1/5, Loss: 1.64071.6407
-EPOCH 2/5, Loss: 1.12811.1281
-EPOCH 3/5, Loss: 0.69510.6951
-EPOCH 4/5, Loss: 0.57120.5712
-EPOCH 5/5, Loss: 0.33620.3362
+TRAINING...
+EPOCH 1/15, Loss: 1.0956
+EPOCH 2/15, Loss: 0.7308
+EPOCH 3/15, Loss: 0.4557
+EPOCH 4/15, Loss: 0.4566
+EPOCH 5/15, Loss: 0.4934
+EPOCH 6/15, Loss: 0.3920
+EPOCH 7/15, Loss: 0.3638
+EPOCH 8/15, Loss: 0.4017
+EPOCH 9/15, Loss: 0.3439
+...
+EPOCH 24/25, Loss: 0.1281
+EPOCH 25/25, Loss: 0.0886
+Time spent training: 1122.34s
 
-EVALUATING
-Sample labels: [6 8 1 9 8 0 8 1 1 2]
-Sample preds: [6 8 1 9 8 0 8 1 1 2]
-Accuracy: 85.07%
+EVALUATING...
+Sample labels: [3 6 0 0 9 1 8 2 7 3]
+Sample preds: [3 2 0 0 9 1 8 2 7 3]
+Accuracy: 94.77%
 ```
 
 MLP on MNIST
@@ -47,32 +56,33 @@ Labels shape: (60000,)
 
 ARCHITECTURE:
 <Linear: 784 -> 128>
-<ReLU: 128 -> 128>
+<ReLU>
 <Linear: 128 -> 64>
-<ReLU: 64 -> 64>
+<ReLU>
 <Linear: 64 -> 10>
 <CrossEntropyLoss>
 
-TRAINING
-EPOCH 1/50, Loss: 6.3107107
-EPOCH 2/50, Loss: 5.5198198
-EPOCH 3/50, Loss: 4.4785785
-EPOCH 4/50, Loss: 4.2003003
-EPOCH 5/50, Loss: 3.8099099
-EPOCH 6/50, Loss: 3.5367367
-EPOCH 7/50, Loss: 2.5029029
-EPOCH 8/50, Loss: 2.3987987
-EPOCH 9/50, Loss: 2.1766766
-EPOCH 10/50, Loss: 2.145050
+TRAINING...
+EPOCH 1/50, Loss: 6.3107
+EPOCH 2/50, Loss: 5.5198
+EPOCH 3/50, Loss: 4.4785
+EPOCH 4/50, Loss: 4.2003
+EPOCH 5/50, Loss: 3.8099
+EPOCH 6/50, Loss: 3.5367
+EPOCH 7/50, Loss: 2.5029
+EPOCH 8/50, Loss: 2.3987
+EPOCH 9/50, Loss: 2.1766
+EPOCH 10/50, Loss: 2.1450
 ...
-EPOCH 47/50, Loss: 0.15611561
-EPOCH 48/50, Loss: 0.17551755
-EPOCH 49/50, Loss: 0.14681468
-EPOCH 50/50, Loss: 0.15551555
+EPOCH 47/50, Loss: 0.0691
+EPOCH 48/50, Loss: 0.0742
+EPOCH 49/50, Loss: 0.0860
+EPOCH 50/50, Loss: 0.0722
+Time spent training: 29.86s
 
-EVALUATING
-Sample labels: [1 9 3 8 6 1 4 1 7 5]
-Sample preds: [1 9 3 8 8 1 4 1 7 5]
+EVALUATING...
+Sample labels: [6 2 2 7 6 0 6 9 4 8]
+Sample preds: [6 2 2 7 6 0 6 9 4 8]
 Accuracy: 95.09%
 ```
 
@@ -133,7 +143,7 @@ python main.py
 ## Roadmap
 
 - [x] MLP basic functionality
-- [ ] Add Conv2d
+- [x] Add Conv2d
 - [ ] Add weight inits
 - [ ] More loss func's
 - [ ] C++ remake

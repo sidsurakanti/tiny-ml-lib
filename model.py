@@ -2,6 +2,7 @@ from batcher import Batcher
 from defs import Sequence, Array
 import numpy as np
 from math import ceil
+from datetime import datetime
 
 class Model:
   def __init__(self, sequence: Sequence, loss_fn) -> None:
@@ -27,10 +28,19 @@ class Model:
       if hasattr(layer, "step"):
         layer.step()
 
-  def fit(self, epochs: int = 5, *args, **kwargs):
+  def fit(self, epochs: int = 5, *args, timed: bool = True, **kwargs):
+    print("\nARCHITECTURE:")
+    for layer in self.sequence:
+        print(layer)
+    print(self.loss)
+
+    print("\nTRAINING...")
+    start_time = datetime.now()    
     for epoch in range(epochs):
       loss = self.train(*args, **kwargs)
       print(f"EPOCH {epoch + 1}/{epochs}, Loss: {loss:.4f}")
+    print(f"Time spent training: {(datetime.now() - start_time).total_seconds():.2f}s")
+
     return 
 
   def train(self, X: Array, y: Array, batch_size: int = 0):  
@@ -47,6 +57,7 @@ class Model:
     return loss
 
   def evaluate(self, X_test: Array, y_test: Array):
+    print("\nEVALUATING...")
     out, _ = self.forward(X_test, y_test)
     preds = np.argmax(out, axis=1)
     correct = np.sum(preds == y_test)

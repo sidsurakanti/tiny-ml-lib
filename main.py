@@ -22,6 +22,7 @@ y_train, X_train = train[0], train[1:] / 255
 
 X_test, X_train = X_test.T, X_train.T
 m, n = X_train.shape
+
 cX_train = X_train.reshape(m, 1, 28, 28)
 cX_test = X_test.reshape(X_test.shape[0], 1, 28, 28)
 
@@ -36,17 +37,14 @@ def main():
   fc = Linear(n, 10) # (10, 784) * (784, m) -> (10, m) 
   a = ReLU() # output-> (10, m)
   fc2 = Linear(10, 10)
-
   # 28 should acc be sqrt(n) but i dont feel like generalizing
   conv2d = Conv2d((1, 28, 28), 5, 3)
 
-  # print(conv2d)
   # out = conv2d.forward(cX_train)
   # print(out.shape)
   # dz = np.ones_like(out)
   # dx = conv2d.backwards(dz)  
-  # print(dx.shape)
-  # print(dx[0])
+  # print(dx.shape, np.mean(dx), dx[0])
 
   loss_fn = CrossEntropyLoss()
   # loss_fn = MSELoss()
@@ -59,6 +57,7 @@ def main():
   #       Linear(64, 10)
   #     ]
 
+  # i dont wanna train a bigger model on my buns cpu 🥀
   sequence = [
         Conv2d((1, 28, 28), 5, 5),
         ReLU(),
@@ -68,18 +67,11 @@ def main():
         Linear(128, 10)
       ]
 
-  print("\nARCHITECTURE:")
-  for layer in sequence:
-    print(layer)
-  print(loss_fn)
-
   model = Model(sequence, loss_fn)
 
-  print("\nTRAINING")
-  # model(50, X_train, y_train, batch_size=32)
-  model(5, cX_train, y_train, batch_size=32)
+  # model(50, X_train, y_train, batch_size=32, timed=1)
+  model(25, cX_train, y_train, batch_size=32, timed=True)
 
-  print("\nEVALUATING")
   # acc = model.evaluate(X_test, y_test)
   acc = model.evaluate(cX_test, y_test)
   print(f"Accuracy: {acc*100:.2f}%")

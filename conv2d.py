@@ -80,6 +80,6 @@ class Conv2d(Layer):
 
 
   def __repr__(self):
-    return f"<Conv2D: {self.input_shape} -> {self.output_shape}>"
+        return f"<Conv2D: {self.input_shape} -> {self.output_shape}, Filters: {self.filters}, {self.filter_size}x{self.filters}>"
 
 

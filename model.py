@@ -3,6 +3,7 @@ from defs import Sequence, Array
 import numpy as np
 from math import ceil
 from datetime import datetime
+import pickle
 
 class Model:
   def __init__(self, sequence: Sequence, loss_fn) -> None:
@@ -72,11 +73,17 @@ class Model:
   def predict(self, *args, **kwargs):
     raise NotImplementedError("Model predict method not implemented.")
 
-  def summary(self): 
-    raise NotImplementedError("Model summary method not implemented.")
+  def save(self, path: str = "model_weights.pkl"):
+    model_weights = [] 
+    for layer in self.sequence:
+      if hasattr(layer, "W") and hasattr(layer, "b"):
+        model_weights.append((layer.W, layer.b))
 
-  def save(self, path: str):
-    raise NotImplementedError("Model save method not implemented.")
+    with open(path, "wb") as f:
+      pickle.dump(model_weights, f)
+      print("Saved model weights.")
+          
+    return
 
   def load(self, path: str):
     raise NotImplementedError("Model load method not implemented.")
@@ -87,3 +94,6 @@ class Model:
   def __call__(self, *args, **kwargs):
     return self.fit(*args, **kwargs)
 
+if __name__ == "__main__":
+  m = Model(1, 1)
+  m.save()

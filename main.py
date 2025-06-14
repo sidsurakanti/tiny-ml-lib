@@ -50,33 +50,35 @@ def main():
   loss_fn = CrossEntropyLoss()
   # loss_fn = MSELoss()
 
-  # sequence = [
-  #       Linear(784, 128),
-  #       ReLU(),
-  #       Linear(128, 64),
-  #       ReLU(),
-  #       Linear(64, 10)
-  #     ]
-
-  # i dont wanna train a bigger model on my buns cpu 🥀
   sequence = [
-        Conv2d((1, 28, 28), 5, 5),
+        Linear(784, 128),
         ReLU(),
-        MaxPool(),
-        Flatten(),
-        Linear(12*12*5, 128),
+        Linear(128, 64),
         ReLU(),
-        Linear(128, 10)
+        Linear(64, 10)
       ]
+
+  # i dont wanna train a bigger model on my buns macbook cpu 🥀
+  # sequence = [
+  #       Conv2d((1, 28, 28), 5, 5),
+  #       ReLU(),
+  #       # MaxPool(),
+  #       Flatten(),
+  #       Linear(12*12*5, 128),
+  #       ReLU(),
+  #       Linear(128, 10)
+  #     ]
 
   model = Model(sequence, loss_fn)
 
-  # model(50, X_train, y_train, batch_size=32, timed=1)
-  model(5, cX_train, y_train, batch_size=32, timed=True)
+  model(50, X_train, y_train, batch_size=32, timed=1)
+  # model(10, cX_train, y_train, batch_size=32, timed=True)
 
-  # acc = model.evaluate(X_test, y_test)
-  acc = model.evaluate(cX_test, y_test)
+  acc = model.evaluate(X_test, y_test)
+  # acc = model.evaluate(cX_test, y_test)
   print(f"Accuracy: {acc*100:.2f}%")
+  if input("Save weights? (y/n) ").lower() in ("y", "yes"):
+    model.save()
 
 
 if __name__ == "__main__":

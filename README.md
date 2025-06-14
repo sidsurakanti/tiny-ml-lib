@@ -1,6 +1,6 @@
 # Overview
 
-A small machine learning library built from scratch using NumPy with functionality for core components like CNN and MLPs.
+A lite machine learning framework built from scratch using NumPy with functionality for core components like CNN and MLPs.
 
 ## Features
 
@@ -9,6 +9,7 @@ A small machine learning library built from scratch using NumPy with functionali
 - Flatten layer
 - Max pooling layer
 - ReLU activation
+- Softmax layer
 - Cross Entropy Loss & MSE Loss
 - Model & sequential classes
 - Training & eval loop
@@ -33,12 +34,6 @@ TRAINING...
 EPOCH 1/15, Loss: 1.0956
 EPOCH 2/15, Loss: 0.7308
 EPOCH 3/15, Loss: 0.4557
-EPOCH 4/15, Loss: 0.4566
-EPOCH 5/15, Loss: 0.4934
-EPOCH 6/15, Loss: 0.3920
-EPOCH 7/15, Loss: 0.3638
-EPOCH 8/15, Loss: 0.4017
-EPOCH 9/15, Loss: 0.3439
 ...
 EPOCH 24/25, Loss: 0.1281
 EPOCH 25/25, Loss: 0.0886
@@ -51,9 +46,6 @@ Accuracy: 94.77%
 ```
 ...again with MaxPool
 ```bash
-Input shape: (60000, 784)
-Labels shape: (60000,)
-
 ARCHITECTURE:
 <Conv2D: (1, 28, 28) -> (5, 24, 24), Filters: 5, 5x5>
 <ReLU>
@@ -95,29 +87,22 @@ TRAINING...
 EPOCH 1/50, Loss: 6.3107
 EPOCH 2/50, Loss: 5.5198
 EPOCH 3/50, Loss: 4.4785
-EPOCH 4/50, Loss: 4.2003
-EPOCH 5/50, Loss: 3.8099
-EPOCH 6/50, Loss: 3.5367
-EPOCH 7/50, Loss: 2.5029
-EPOCH 8/50, Loss: 2.3987
-EPOCH 9/50, Loss: 2.1766
-EPOCH 10/50, Loss: 2.1450
 ...
-EPOCH 47/50, Loss: 0.0691
-EPOCH 48/50, Loss: 0.0742
 EPOCH 49/50, Loss: 0.0860
 EPOCH 50/50, Loss: 0.0722
-Time spent training: 29.86s
+Time spent training: 22.08s
 
 EVALUATING...
-Sample labels: [6 2 2 7 6 0 6 9 4 8]
-Sample preds: [6 2 2 7 6 0 6 9 4 8]
-Accuracy: 95.09%
+Sample labels: [1 9 3 9 9 1 9 8 3 2]
+Sample preds: [1 9 3 9 9 1 9 3 3 2]
+Accuracy: 96.02%
+Saved model weights.
 ```
 
 ## Why make this?
 
-- I wanted to learn more about ml libraries and how they work under the hood
+- I wanted to learn more about ml libraries and autograd (didn't get to implementing it) 
+- Wanted to implement a Convolutional layer on my own
 - Wanted to experiment with a framework and learn cool stuff
 
 

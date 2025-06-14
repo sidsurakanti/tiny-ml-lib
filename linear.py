@@ -9,23 +9,23 @@ class Linear(Layer):
     self.outputs = outputs
     self.size = (inputs, outputs)
     # init weights and biases
-    self.weights = np.random.randn(self.inputs, self.outputs)
-    self.biases = np.random.randn(1, self.outputs)
+    self.W = np.random.randn(self.inputs, self.outputs)
+    self.b = np.random.randn(1, self.outputs)
 
     # forward pass
     self.X = None
     # backward pass
-    self.dW = np.zeros_like(self.weights)
-    self.db = np.zeros_like(self.biases)
+    self.dW = np.zeros_like(self.W)
+    self.db = np.zeros_like(self.b)
 
   def forward(self, X: Array) -> Array:
     self.X = X 
-    # print(self.weights.shape, self.X.shape)
+    # print(self.W.shape, self.X.shape)
 
     # X -> (m, inputs)
     # W -> (inputs, outputs) 
     # XW + b -> (m, outputs) Z
-    output =  self.X @ self.weights + self.biases
+    output =  self.X @ self.W + self.b
     return output 
 
   def backwards(self, dZ: Array) -> tuple[Array, Array]:
@@ -35,20 +35,20 @@ class Linear(Layer):
     # dW -> (inputs, outputs)
     self.dW = self.X.T @ dZ / m # (m, inputs).T * (m, outputs) -> (inputs, outputs) 
     self.db = np.sum(dZ, axis=0, keepdims=True) / m # (m, outputs) -> (1, outputs)
-    dX = dZ @ self.weights.T  # (m, outputs) * (inputs, outputs).T -> (m, inputs)
+    dX = dZ @ self.W.T  # (m, outputs) * (inputs, outputs).T -> (m, inputs)
 
     return dX
   
   def step(self, learning_rate: float = 0.1) -> None:
     # update weights and biases
-    self.weights -= learning_rate * self.dW
-    self.biases -= learning_rate * self.db
+    self.W -= learning_rate * self.dW
+    self.b -= learning_rate * self.db
 
-    # print(np.mean(self.weights), np.std(self.weights))
+    # print(np.mean(self.W), np.std(self.W))
     # print(np.mean(self.dW), np.std(self.dW))
     # reset gradients
-    self.dW = np.zeros_like(self.weights)
-    self.db = np.zeros_like(self.biases)
+    self.dW = np.zeros_like(self.W)
+    self.db = np.zeros_like(self.b)
     return
 
   def __repr__(self) -> str:

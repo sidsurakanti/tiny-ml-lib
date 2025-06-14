@@ -2,6 +2,7 @@ from model import Model
 from defs import Sequence, Array
 from linear import Linear
 from conv2d import Conv2d
+from maxpool import MaxPool
 from flatten import Flatten
 from relu import ReLU
 import pandas as pd 
@@ -61,8 +62,9 @@ def main():
   sequence = [
         Conv2d((1, 28, 28), 5, 5),
         ReLU(),
+        MaxPool(),
         Flatten(),
-        Linear(24*24*5, 128),
+        Linear(12*12*5, 128),
         ReLU(),
         Linear(128, 10)
       ]
@@ -70,7 +72,7 @@ def main():
   model = Model(sequence, loss_fn)
 
   # model(50, X_train, y_train, batch_size=32, timed=1)
-  model(25, cX_train, y_train, batch_size=32, timed=True)
+  model(5, cX_train, y_train, batch_size=32, timed=True)
 
   # acc = model.evaluate(X_test, y_test)
   acc = model.evaluate(cX_test, y_test)

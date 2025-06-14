@@ -7,6 +7,7 @@ A small machine learning library built from scratch using NumPy with functionali
 - Fully connected layer
 - Convolutional layer
 - Flatten layer
+- Max pooling layer
 - ReLU activation
 - Cross Entropy Loss & MSE Loss
 - Model & sequential classes
@@ -47,6 +48,34 @@ EVALUATING...
 Sample labels: [3 6 0 0 9 1 8 2 7 3]
 Sample preds: [3 2 0 0 9 1 8 2 7 3]
 Accuracy: 94.77%
+```
+...again with MaxPool
+```bash
+Input shape: (60000, 784)
+Labels shape: (60000,)
+
+ARCHITECTURE:
+<Conv2D: (1, 28, 28) -> (5, 24, 24), Filters: 5, 5x5>
+<ReLU>
+<MaxPool>
+<Flatten>
+<Linear: 720 -> 128>
+<ReLU>
+<Linear: 128 -> 10>
+<CrossEntropyLoss>
+
+TRAINING...
+EPOCH 1/5, Loss: 0.6285
+EPOCH 2/5, Loss: 0.4906
+EPOCH 3/5, Loss: 0.3883
+EPOCH 4/5, Loss: 0.3109
+EPOCH 5/5, Loss: 0.3366
+Time spent training: 1116.21s
+
+EVALUATING...
+Sample labels: [4 9 5 0 6 0 7 9 8 8]
+Sample preds: [4 9 5 0 6 0 9 9 8 8]
+Accuracy: 87.67%
 ```
 
 MLP on MNIST
@@ -144,6 +173,7 @@ python main.py
 
 - [x] MLP basic functionality
 - [x] Add Conv2d
+- [x] Add pooling layer
 - [ ] Add weight inits
 - [ ] More loss func's
 - [ ] C++ remake

@@ -24,16 +24,13 @@ class Model:
       dZ = layer.backwards(dZ)
     return dZ
   
-  def step(self):
+  def step(self, learning_rate: int):
     for layer in self.sequence:
       if hasattr(layer, "step"):
-        layer.step()
+        layer.step(learning_rate=learning_rate)
 
   def fit(self, epochs: int = 5, *args, timed: bool = True, **kwargs):
-    print("\nARCHITECTURE:")
-    for layer in self.sequence:
-        print(layer)
-    print(self.loss)
+    print(self)
 
     print("\nTRAINING...")
     start_time = datetime.now()    
@@ -44,7 +41,7 @@ class Model:
 
     return 
 
-  def train(self, X: Array, y: Array, batch_size: int = 0):  
+  def train(self, X: Array, y: Array, learning_rate: int = 0.01, batch_size: int = 0):  
     batches = Batcher((X, y), batch_size)
     total_batches = len(batches)
 
@@ -54,11 +51,14 @@ class Model:
       if i % ceil(total_batches / 4) == 0 or i == total_batches:
         print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}", end="\r")
 
-      self.step()
+      self.step(learning_rate)
     return loss
 
   def evaluate(self, X_test: Array, y_test: Array):
     print("\nEVALUATING...")
+    indices = np.random.permutation(len(X_test))
+    X_test, y_test = X_test[indices], y_test[indices]
+
     out, _ = self.forward(X_test, y_test)
     preds = np.argmax(out, axis=1)
     correct = np.sum(preds == y_test)
@@ -73,27 +73,63 @@ class Model:
   def predict(self, *args, **kwargs):
     raise NotImplementedError("Model predict method not implemented.")
 
-  def save(self, path: str = "model_weights.pkl"):
-    model_weights = [] 
-    for layer in self.sequence:
-      if hasattr(layer, "W") and hasattr(layer, "b"):
-        model_weights.append((layer.W, layer.b))
+  @property
+  def state_dict(self):
+    state = {
+            "weights": [l.get_weights() for l in self.sequence if hasattr(l, "get_weights")],
+            "arch": [(type(l).__name__, l.input_shape, l.output_shape) for l in self.sequence if hasattr(l, "input_shape")]
+        }
 
+    return state
+
+  def save(self, path: str = "model_weights.pkl"):
     with open(path, "wb") as f:
-      pickle.dump(model_weights, f)
-      print("Saved model weights.")
-          
-    return
+      pickle.dump(self.state_dict, f)
+    return print("Saved model weights to", path)
 
   def load(self, path: str):
-    raise NotImplementedError("Model load method not implemented.")
+    with open(path, "rb") as f:
+        state_dict = pickle.load(f)
+
+    assert state_dict["arch"] == self.state_dict["arch"], "Model type mismatch."
+    layers = [l for l in self.sequence if hasattr(l, "set_weights")]
+
+    for layer, weights in zip(layers, state_dict["weights"]): 
+      layer.set_weights(*weights)
+
+    return print("Loaded model weights from", path)
 
   def __repr__(self):
-    return f"Model()"
+    lines = ["Model("]
+    total_params = 0
+
+    for i, layer in enumerate(self.sequence):
+      name = type(layer).__name__
+      has_shapes = hasattr(layer, "input_shape") and hasattr(layer, "output_shape")
+
+      if has_shapes:
+        in_shape = layer.input_shape
+        out_shape = layer.output_shape
+        shape_str = f" ({in_shape} → {out_shape})"
+      else:
+        shape_str = ""
+
+      lines.append(f"  [{i}] {name:<12}{shape_str}")
+
+      if hasattr(layer, "get_weights"):
+        weights = layer.get_weights()
+        total_params += sum(np.prod(w.shape) for w in weights)
+
+    lines.append(f"  Loss: {type(self.loss).__name__}")
+    lines.append(f"  Total parameters: {total_params:,}")
+    lines.append(")")
+    return "\n".join(lines)
 
   def __call__(self, *args, **kwargs):
     return self.fit(*args, **kwargs)
 
 if __name__ == "__main__":
   m = Model(1, 1)
-  m.save()
+  print(dir(Model))
+  print(id(m), type(m).__name__)
+  # m.save()

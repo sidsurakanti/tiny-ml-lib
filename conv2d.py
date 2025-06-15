@@ -4,7 +4,8 @@ from layer import Layer
 from typing import Tuple
 
 class Conv2d(Layer):
-  def __init__(self, input_shape: Tuple[int], filters: int, filter_size: int, stride: int = 1, padding: str = 'valid'):
+  def __init__(self, input_shape: Tuple[int], filters: int, filter_size: int, stride: int = 1, padding: str = 'valid', init: str = "he") -> None:
+
     input_channels, input_height, input_width = input_shape
     self.input_shape = input_shape
     self.input_channels = input_channels
@@ -21,7 +22,8 @@ class Conv2d(Layer):
     self.X = None
     self.out = None
 
-    self.W = np.random.randn(*self.filter_shape)
+    INITS = { "he": np.sqrt(2  / np.prod(input_shape)), "xavier": np.sqrt(6 / (np.prod(input_shape) + np.prod(self.output_shape))), "none": 1}
+    self.W = np.random.randn(*self.filter_shape) * INITS[init]
     self.b = np.zeros(self.output_shape)
     self.dW = np.zeros(self.filter_shape)
     self.db = np.zeros(self.output_shape)
@@ -78,6 +80,13 @@ class Conv2d(Layer):
     self.db = np.zeros_like(self.b) 
     return
 
+  def get_weights(self):
+    return (self.W, self.b)
+
+  def set_weights(self, W, b):
+    self.W = W
+    self.b = b
+    return 
 
   def __repr__(self):
         return f"<Conv2D: {self.input_shape} -> {self.output_shape}, Filters: {self.filters}, {self.filter_size}x{self.filters}>"

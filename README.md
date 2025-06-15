@@ -10,6 +10,7 @@ A lite machine learning framework built from scratch using NumPy with functional
 - Max pooling layer
 - ReLU activation
 - Softmax layer
+- Model save/load
 - Cross Entropy Loss & MSE Loss
 - Model & sequential classes
 - Training & eval loop
@@ -20,41 +21,46 @@ Convolutional NN  on MNIST
 ```bash
 Input shape: (60000, 784)
 Labels shape: (60000,)
-
-ARCHITECTURE:
-<Conv2D: (1, 28, 28) -> (5, 24, 24), Filters: 5, 5x5>
-<ReLU>
-<Flatten>
-<Linear: 2880 -> 128>
-<ReLU>
-<Linear: 128 -> 10>
-<CrossEntropyLoss>
+Model(
+  [0] Conv2d       ((1, 28, 28) → (5, 24, 24))
+  [1] ReLU
+  [2] Flatten
+  [3] Linear       (2880 → 128)
+  [4] ReLU
+  [5] Linear       (128 → 10)
+  Loss: CrossEntropyLoss
+  Total parameters: 373,063
+)
 
 TRAINING...
-EPOCH 1/15, Loss: 1.0956
-EPOCH 2/15, Loss: 0.7308
-EPOCH 3/15, Loss: 0.4557
+EPOCH 1/10, Loss: 0.1227
 ...
-EPOCH 24/25, Loss: 0.1281
-EPOCH 25/25, Loss: 0.0886
-Time spent training: 1122.34s
+EPOCH 9/10, Loss: 0.0355
+EPOCH 10/10, Loss: 0.0347
+Time spent training: 437.89s
 
 EVALUATING...
-Sample labels: [3 6 0 0 9 1 8 2 7 3]
-Sample preds: [3 2 0 0 9 1 8 2 7 3]
-Accuracy: 94.77%
+Sample labels: [9 2 9 8 9 7 1 2 4 3]
+Sample preds: [9 2 9 8 9 7 1 2 4 3]
+Accuracy: 97.52%
+
+Save weights? (y/n) >>> y
+File name? (empty for default) >>> cnn-weights
+Saved model weights to cnn-weights.pkl
 ```
 ...again with MaxPool
 ```bash
-ARCHITECTURE:
-<Conv2D: (1, 28, 28) -> (5, 24, 24), Filters: 5, 5x5>
-<ReLU>
-<MaxPool>
-<Flatten>
-<Linear: 720 -> 128>
-<ReLU>
-<Linear: 128 -> 10>
-<CrossEntropyLoss>
+Model(
+  [0] Conv2d       ((1, 28, 28) → (5, 24, 24))
+  [1] ReLU
+  [2] MaxPool
+  [3] Flatten
+  [4] Linear       (720 → 128)
+  [5] ReLU
+  [6] Linear       (128 → 10)
+  Loss: CrossEntropyLoss
+  Total parameters: 96,583
+)
 
 TRAINING...
 EPOCH 1/5, Loss: 0.6285
@@ -74,30 +80,42 @@ MLP on MNIST
 ```bash
 Input shape: (60000, 784)
 Labels shape: (60000,)
-
-ARCHITECTURE:
-<Linear: 784 -> 128>
-<ReLU>
-<Linear: 128 -> 64>
-<ReLU>
-<Linear: 64 -> 10>
-<CrossEntropyLoss>
+Model(
+  [0] Linear       (784 → 256)
+  [1] ReLU
+  [2] Linear       (256 → 256)
+  [3] ReLU
+  [4] Linear       (256 → 10)
+  Loss: CrossEntropyLoss
+  Total parameters: 269,322
+)
 
 TRAINING...
-EPOCH 1/50, Loss: 6.3107
-EPOCH 2/50, Loss: 5.5198
-EPOCH 3/50, Loss: 4.4785
+EPOCH 1/25, Loss: 0.4248
+EPOCH 2/25, Loss: 0.2641
+EPOCH 3/25, Loss: 0.1849
 ...
-EPOCH 49/50, Loss: 0.0860
-EPOCH 50/50, Loss: 0.0722
-Time spent training: 22.08s
+EPOCH 25/25, Loss: 0.0451
+Time spent training: 31.27s
 
 EVALUATING...
-Sample labels: [1 9 3 9 9 1 9 8 3 2]
-Sample preds: [1 9 3 9 9 1 9 3 3 2]
-Accuracy: 96.02%
-Saved model weights.
+Sample labels: [1 6 9 6 8 8 3 1 4 2]
+Sample preds: [1 6 9 6 8 8 3 1 4 2]
+Accuracy: 98.20%
+
+Save weights? (y/n) >>> y
+File name? (empty for default) >>> mlp-weights
+Saved model weights to mlp-weights.pkl
 ```
+```bash
+Loaded model weights from mlp-weights.pkl
+
+EVALUATING...
+Sample labels: [2 0 1 9 6 5 5 6 7 8]
+Sample preds: [2 0 1 9 6 5 5 6 7 8]
+Accuracy: 98.13%
+```
+
 
 ## Why make this?
 
@@ -159,7 +177,7 @@ python main.py
 - [x] MLP basic functionality
 - [x] Add Conv2d
 - [x] Add pooling layer
-- [ ] Add weight inits
+- [x] Add weight inits
 - [ ] More loss func's
 - [ ] C++ remake
 

@@ -12,7 +12,7 @@ from losses import CrossEntropyLoss, MSELoss
 
 # MNIST
 # just download mnist into /dataset/* and change file names to match
-test = pd.read_csv("./dataset/train.csv")
+test = pd.read_csv("./dataset/test.csv")
 train = pd.read_csv("./dataset/train.csv")
 
 test = np.array(test.T)
@@ -49,36 +49,42 @@ def main():
 
   loss_fn = CrossEntropyLoss()
   # loss_fn = MSELoss()
-
-  sequence = [
-        Linear(784, 128),
-        ReLU(),
-        Linear(128, 64),
-        ReLU(),
-        Linear(64, 10)
-      ]
-
-  # i dont wanna train a bigger model on my buns macbook cpu 🥀
+  
   # sequence = [
-  #       Conv2d((1, 28, 28), 5, 5),
+  #       Linear(784, 256),
   #       ReLU(),
-  #       # MaxPool(),
-  #       Flatten(),
-  #       Linear(12*12*5, 128),
+  #       Linear(256, 256),
   #       ReLU(),
-  #       Linear(128, 10)
+  #       Linear(256, 10)
   #     ]
 
+  # i dont wanna train a bigger model on my buns macbook cpu 🥀
+  sequence = [
+        Conv2d((1, 28, 28), 5, 5),
+        ReLU(),
+        # MaxPool(),
+        Flatten(),
+        Linear(24*24*5, 128),
+        ReLU(),
+        Linear(128, 10)
+      ]
+
   model = Model(sequence, loss_fn)
+  # model.load("mlp-weights.pkl")
 
-  model(50, X_train, y_train, batch_size=32, timed=1)
-  # model(10, cX_train, y_train, batch_size=32, timed=True)
+  # model(25, X_train, y_train, learning_rate=0.01, batch_size=32, timed=1)
+  model(10, cX_train, y_train, batch_size=32, timed=True)
 
-  acc = model.evaluate(X_test, y_test)
-  # acc = model.evaluate(cX_test, y_test)
+  # acc = model.evaluate(X_test, y_test)
+  acc = model.evaluate(cX_test, y_test)
   print(f"Accuracy: {acc*100:.2f}%")
-  if input("Save weights? (y/n) ").lower() in ("y", "yes"):
-    model.save()
+
+  if input("\nSave weights? (y/n) >>> ").lower() in ("y", "yes"):
+    fpath = input("File name? (empty for default) >>> ")
+    if fpath.strip():
+      model.save(fpath + ".pkl")
+    else:
+      model.save()
 
 
 if __name__ == "__main__":

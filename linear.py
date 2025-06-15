@@ -4,13 +4,16 @@ from layer import Layer
 
 class Linear(Layer):
   # TODO: He init, Xavier init, etc
-  def __init__(self, inputs: int, outputs: int) -> None:
-    self.inputs = inputs
-    self.outputs = outputs
+  def __init__(self, inputs: int, outputs: int, init: str = "he") -> None:
+    INITS = { "he": np.sqrt(2  / inputs), "xavier": np.sqrt(6 / (inputs + outputs)), "none": 1}
+
+    self.input_shape = inputs
+    self.output_shape = outputs
     self.size = (inputs, outputs)
+    
     # init weights and biases
-    self.W = np.random.randn(self.inputs, self.outputs)
-    self.b = np.random.randn(1, self.outputs)
+    self.W = np.random.randn(self.input_shape, self.output_shape) * INITS[init] 
+    self.b = np.random.randn(1, self.output_shape)
 
     # forward pass
     self.X = None
@@ -39,7 +42,7 @@ class Linear(Layer):
 
     return dX
   
-  def step(self, learning_rate: float = 0.1) -> None:
+  def step(self, learning_rate: float = 0.03) -> None:
     # update weights and biases
     self.W -= learning_rate * self.dW
     self.b -= learning_rate * self.db
@@ -51,6 +54,14 @@ class Linear(Layer):
     self.db = np.zeros_like(self.b)
     return
 
+  def get_weights(self):
+    return (self.W, self.b)
+
+  def set_weights(self, W, b):
+    self.W = W
+    self.b = b
+    return 
+
   def __repr__(self) -> str:
-    return f"<Linear: {self.inputs} -> {self.outputs}>"
+    return f"<Linear: {self.input_shape} -> {self.output_shape}>"
 

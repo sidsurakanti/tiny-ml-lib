@@ -178,7 +178,7 @@ python main.py
 - [x] Add Conv2d
 - [x] Add pooling layer
 - [x] Add weight inits
-- [ ] More loss func's
+- [ ] Implement cuda 
 - [ ] C++ remake
 
 ## Support

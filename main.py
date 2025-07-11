@@ -5,7 +5,7 @@ from conv2d import Conv2d
 from maxpool import MaxPool
 from flatten import Flatten
 from relu import ReLU
-import pandas as pd 
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from losses import CrossEntropyLoss, MSELoss
@@ -35,57 +35,57 @@ plt.imshow(X_train[np.random.randint(m)].reshape((28, 28)))
 
 
 def main():
-  fc = Linear(n, 10) # (10, 784) * (784, m) -> (10, m) 
-  a = ReLU() # output-> (10, m)
-  fc2 = Linear(10, 10)
-  # 28 should acc be sqrt(n) but i dont feel like generalizing
-  conv2d = Conv2d((1, 28, 28), 5, 3)
+    fc = Linear(n, 10)  # (10, 784) * (784, m) -> (10, m)
+    a = ReLU()  # output-> (10, m)
+    fc2 = Linear(10, 10)
+    # 28 should acc be sqrt(n) but i dont feel like generalizing
+    conv2d = Conv2d((1, 28, 28), 5, 3)
 
-  # out = conv2d.forward(cX_train)
-  # print(out.shape)
-  # dz = np.ones_like(out)
-  # dx = conv2d.backwards(dz)  
-  # print(dx.shape, np.mean(dx), dx[0])
+    # out = conv2d.forward(cX_train)
+    # print(out.shape)
+    # dz = np.ones_like(out)
+    # dx = conv2d.backwards(dz)
+    # print(dx.shape, np.mean(dx), dx[0])
 
-  loss_fn = CrossEntropyLoss()
-  # loss_fn = MSELoss()
-  
-  # sequence = [
-  #       Linear(784, 256),
-  #       ReLU(),
-  #       Linear(256, 256),
-  #       ReLU(),
-  #       Linear(256, 10)
-  #     ]
+    loss_fn = CrossEntropyLoss()
+    # loss_fn = MSELoss()
 
-  # i dont wanna train a bigger model on my buns macbook cpu 🥀
-  sequence = [
+    # sequence = [
+    #       Linear(784, 256),
+    #       ReLU(),
+    #       Linear(256, 256),
+    #       ReLU(),
+    #       Linear(256, 10)
+    #     ]
+
+    # i dont wanna train a bigger model on my buns macbook cpu 🥀
+    sequence = [
         Conv2d((1, 28, 28), 5, 5),
         ReLU(),
         # MaxPool(),
         Flatten(),
-        Linear(24*24*5, 128),
+        Linear(24 * 24 * 5, 128),
         ReLU(),
-        Linear(128, 10)
-      ]
+        Linear(128, 10),
+    ]
 
-  model = Model(sequence, loss_fn)
-  # model.load("mlp-weights.pkl")
+    model = Model(sequence, loss_fn)
+    # model.load("mlp-weights.pkl")
 
-  # model(25, X_train, y_train, learning_rate=0.01, batch_size=32, timed=1)
-  model(10, cX_train, y_train, batch_size=32, timed=True)
+    # model(25, X_train, y_train, learning_rate=0.01, batch_size=32, timed=1)
+    model(10, cX_train, y_train, batch_size=32, timed=True)
 
-  # acc = model.evaluate(X_test, y_test)
-  acc = model.evaluate(cX_test, y_test)
-  print(f"Accuracy: {acc*100:.2f}%")
+    # acc = model.evaluate(X_test, y_test)
+    acc = model.evaluate(cX_test, y_test)
+    print(f"Accuracy: {acc*100:.2f}%")
 
-  if input("\nSave weights? (y/n) >>> ").lower() in ("y", "yes"):
-    fpath = input("File name? (empty for default) >>> ")
-    if fpath.strip():
-      model.save(fpath + ".pkl")
-    else:
-      model.save()
+    if input("\nSave weights? (y/n) >>> ").lower() in ("y", "yes"):
+        fpath = input("File name? (empty for default) >>> ")
+        if fpath.strip():
+            model.save(fpath + ".pkl")
+        else:
+            model.save()
 
 
 if __name__ == "__main__":
-  main()
+    main()

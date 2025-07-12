@@ -1,3 +1,4 @@
+#include "errors.cuh"
 #include <cstdio>
 #include <cuda_runtime.h>
 #include <iostream>
@@ -6,6 +7,7 @@
 // through the code
 // ** feel free to ignore it
 
+// BIG IDEA:
 // set up matrices
 // cuda malloc on device
 // copy matrices from host -> device
@@ -54,7 +56,7 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int wA, int wB,
 void matMul() {
   // set up data
   dim3 dimsA(3, 5);
-  dim3 dimsB(5, 5);
+  dim3 dimsB(5, 7);
   dim3 dimsC(dimsA.x, dimsB.y);
 
   unsigned int size_A = dimsA.x * dimsA.y;
@@ -68,42 +70,46 @@ void matMul() {
   float *A_h, *A_d, *B_h, *B_d, *C_h, *C_d;
 
   // alloc pinned memory on host for faster cpy times
-  cudaMallocHost(&A_h, mem_sizeA);
-  cudaMallocHost(&B_h, mem_sizeB);
-  cudaMallocHost(&C_h, mem_sizeC);
+  CU_CHECK(cudaMallocHost(&A_h, mem_sizeA));
+  CU_CHECK(cudaMallocHost(&B_h, mem_sizeB));
+  CU_CHECK(cudaMallocHost(&C_h, mem_sizeC));
 
   matInit(A_h, size_A, 1);
   matInit(B_h, size_B, 2);
 
   // allocate device mem
-  cudaMalloc(&A_d, mem_sizeA);
-  cudaMalloc(&B_d, mem_sizeB);
-  cudaMalloc(&C_d, mem_sizeC);
+  CU_CHECK(cudaMalloc(&A_d, mem_sizeA));
+  CU_CHECK(cudaMalloc(&B_d, mem_sizeB));
+  CU_CHECK(cudaMalloc(&C_d, mem_sizeC));
 
   // copy matx's from host to device async
   // NOTE: seperate from host thread, so basically making this nonblocking
   cudaStream_t stream;
   cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
 
-  cudaMemcpyAsync(A_d, A_h, mem_sizeA, cudaMemcpyHostToDevice, stream);
-  cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream);
+  CU_CHECK(
+      cudaMemcpyAsync(A_d, A_h, mem_sizeA, cudaMemcpyHostToDevice, stream));
+  CU_CHECK(
+      cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream));
 
   const int BLOCK_SIZE = 16;
 
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-  dim3 gridSize((dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE,
-                (dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE); // blocks per grid
+  dim3 gridSize((dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE,
+                (dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE); // blocks per grid
   // <<<blocks in grid, block size (threads in block), dynamic shared mem,
   // gpu stream to run on>>>
   // NOTE: we're passing in dimsA & B .y b/c in cuda width is columns
   MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
       A_d, B_d, C_d, dimsA.y, dimsB.y, dimsC.y, dimsA.x);
 
-  cudaStreamSynchronize(stream);
+  CU_CHECK(cudaGetLastError());
+  CU_CHECK(cudaStreamSynchronize(stream));
 
   // copy result back to host
-  cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream);
-  cudaStreamSynchronize(stream);
+  CU_CHECK(
+      cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream));
+  CU_CHECK(cudaStreamSynchronize(stream));
 
   printf("\nMatrix A (%d x %d):\n", dimsA.x, dimsA.y);
   for (int i = 0; i < size_A; i++) {
@@ -119,7 +125,7 @@ void matMul() {
       printf("\n");
   }
 
-  printf("\nMatrix C = A * B (%d x %d):\n", dimsC.y, dimsC.x);
+  printf("\nMatrix C = A * B (%d x %d):\n", dimsC.x, dimsC.y);
   for (int i = 0; i < size_C; i++) {
     printf("%6.2f ", C_h[i]);
     if ((i + 1) % dimsC.x == 0)
@@ -133,6 +139,7 @@ void matMul() {
   cudaFree(A_d);
   cudaFree(B_d);
   cudaFree(C_d);
+  cudaStreamDestroy(stream);
 }
 
 int main() {

@@ -20,7 +20,8 @@ void matInit(float *mat, int size, int n) {
 
 // TODO: use shared memory to make this faster
 template <int BLOCK_SIZE>
-__global__ void MatMulKernel(float *A, float *B, float *C, int wA, int wB) {
+__global__ void MatMulKernel(float *A, float *B, float *C, int wA, int wB,
+                             int wC, int hA) {
   // NOTE: y for rows (vertical) in cuda and x (horiz) for cols
   int offsetY = blockDim.y * blockIdx.y;
   int offsetX = blockDim.x * blockIdx.x;
@@ -35,10 +36,14 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int wA, int wB) {
   int row = threadIdx.y + offsetY;
   int col = threadIdx.x + offsetX;
 
+  // bounds checking so we don't access uninit'd memory
+  if (row >= hA || col >= wC)
+    return;
+
   // NOTE: have to index by row major bc everything is 1D
   float cSum = 0.0f;
   for (int i = 0; i < wA; i++) {
-    cSum += A[wA * row + i] * B[wB * i + col];
+    cSum += A[row * wA + i] * B[i * wB + col];
   }
 
   C[row * wB + col] = cSum;
@@ -49,7 +54,7 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int wA, int wB) {
 void matMul() {
   // set up data
   dim3 dimsA(3, 5);
-  dim3 dimsB(5, 3);
+  dim3 dimsB(5, 5);
   dim3 dimsC(dimsA.x, dimsB.y);
 
   unsigned int size_A = dimsA.x * dimsA.y;
@@ -83,15 +88,16 @@ void matMul() {
   cudaMemcpyAsync(A_d, A_h, mem_sizeA, cudaMemcpyHostToDevice, stream);
   cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream);
 
-  const int BLOCK_SIZE = 4;
+  const int BLOCK_SIZE = 16;
 
-  dim3 blockSize(3, 3); // threads per block
-  dim3 gridSize(1, 1);  // blocks per grid
+  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+  dim3 gridSize((dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE,
+                (dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE); // blocks per grid
   // <<<blocks in grid, block size (threads in block), dynamic shared mem,
   // gpu stream to run on>>>
   // NOTE: we're passing in dimsA & B .y b/c in cuda width is columns
-  MatMulKernel<BLOCK_SIZE>
-      <<<gridSize, blockSize, 1, stream>>>(A_d, B_d, C_d, dimsA.y, dimsB.y);
+  MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
+      A_d, B_d, C_d, dimsA.y, dimsB.y, dimsC.y, dimsA.x);
 
   cudaStreamSynchronize(stream);
 
@@ -99,14 +105,14 @@ void matMul() {
   cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream);
   cudaStreamSynchronize(stream);
 
-  printf("\nMatrix A (%d x %d):\n", dimsA.y, dimsA.x);
+  printf("\nMatrix A (%d x %d):\n", dimsA.x, dimsA.y);
   for (int i = 0; i < size_A; i++) {
     printf("%4.1f ", A_h[i]);
     if ((i + 1) % dimsA.x == 0)
       printf("\n");
   }
 
-  printf("\nMatrix B (%d x %d):\n", dimsB.y, dimsB.x);
+  printf("\nMatrix B (%d x %d):\n", dimsB.x, dimsB.y);
   for (int i = 0; i < size_B; i++) {
     printf("%4.1f ", B_h[i]);
     if ((i + 1) % dimsB.x == 0)

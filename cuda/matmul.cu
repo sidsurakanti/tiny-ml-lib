@@ -97,11 +97,27 @@ void matMul() {
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
   dim3 gridSize((dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE,
                 (dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE); // blocks per grid
+
+  cudaEvent_t start, stop;
+  CU_CHECK(cudaEventCreate(&start));
+  CU_CHECK(cudaEventCreate(&stop));
+  CU_CHECK(cudaEventRecord(start, stream));
+
   // <<<blocks in grid, block size (threads in block), dynamic shared mem,
   // gpu stream to run on>>>
   // NOTE: we're passing in dimsA & B .y b/c in cuda width is columns
   MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
       A_d, B_d, C_d, dimsA.y, dimsB.y, dimsC.y, dimsA.x);
+
+  CU_CHECK(cudaEventRecord(stop, stream));
+  CU_CHECK(cudaEventSynchronize(stop));
+
+  float elapsed;
+  CU_CHECK(cudaEventElapsedTime(&elapsed, start, stop));
+  printf("[TIME] Completed in %.4gms.\n", elapsed);
+
+  CU_CHECK(cudaEventDestroy(start));
+  CU_CHECK(cudaEventDestroy(stop));
 
   CU_CHECK(cudaGetLastError());
   CU_CHECK(cudaStreamSynchronize(stream));
@@ -143,7 +159,7 @@ void matMul() {
 }
 
 int main() {
-  std::cout << "[CUDA] Launching matrix multiplication kernel...";
+  std::cout << "[CUDA] Launching matrix multiplication kernel...\n";
   matMul();
   std::cout << "\nFinished!" << std::endl;
   return 0;

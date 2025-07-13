@@ -14,6 +14,8 @@
 // do matmul
 // cpy back to host
 
+#define BLOCK_SIZE 16
+
 void matInit(float *mat, int size, int n) {
   for (int i = 0; i < size; i++) {
     mat[i] = n;
@@ -21,9 +23,10 @@ void matInit(float *mat, int size, int n) {
 }
 
 // TODO: use shared memory to make this faster
-template <int BLOCK_SIZE>
-__global__ void MatMulKernel(float *A, float *B, float *C, int wA, int wB,
-                             int wC, int hA) {
+template <int block_size>
+// (m, n) * (n, k) = (m, k)
+__global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
+                             int k) {
   // NOTE: y for rows (vertical) in cuda and x (horiz) for cols
   int offsetY = blockDim.y * blockIdx.y;
   int offsetX = blockDim.x * blockIdx.x;
@@ -39,24 +42,24 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int wA, int wB,
   int col = threadIdx.x + offsetX;
 
   // bounds checking so we don't access uninit'd memory
-  if (row >= hA || col >= wC)
+  if (row >= m || col >= k)
     return;
 
-  // NOTE: have to index by row major bc everything is 1D
-  float cSum = 0.0f;
-  for (int i = 0; i < wA; i++) {
-    cSum += A[row * wA + i] * B[i * wB + col];
+  float sum = 0.0f;
+  for (int i = 0; i < n; i++) {
+    // NOTE: have to index by row major bc everything is 1D
+    sum += A[row * n + i] * B[k * i + col];
   }
 
-  C[row * wB + col] = cSum;
+  C[row * k + col] = sum;
   // printf("%f row: %d, col: %d, %f, %f\n ", cSum, row, col, A[wA * row + 1],
   //        B[wB * 1 + col]);
 }
 
 void matMul() {
   // set up data
-  dim3 dimsA(3, 5);
-  dim3 dimsB(5, 7);
+  dim3 dimsA(60000, 784);
+  dim3 dimsB(784, 258);
   dim3 dimsC(dimsA.x, dimsB.y);
 
   unsigned int size_A = dimsA.x * dimsA.y;
@@ -92,11 +95,13 @@ void matMul() {
   CU_CHECK(
       cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream));
 
-  const int BLOCK_SIZE = 16;
+  printf("[OPERATION] (%d, %d) * (%d, %d)\n", dimsA.x, dimsA.y, dimsA.y,
+         dimsB.y);
 
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-  dim3 gridSize((dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE,
-                (dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE); // blocks per grid
+  unsigned int gridRows = (dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridSize(gridCols, gridRows); // blocks per grid
 
   cudaEvent_t start, stop;
   CU_CHECK(cudaEventCreate(&start));
@@ -105,9 +110,9 @@ void matMul() {
 
   // <<<blocks in grid, block size (threads in block), dynamic shared mem,
   // gpu stream to run on>>>
-  // NOTE: we're passing in dimsA & B .y b/c in cuda width is columns
+  // NOTE: m = dimsA.x, n = dimsA.y, k = dimsB.y
   MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
-      A_d, B_d, C_d, dimsA.y, dimsB.y, dimsC.y, dimsA.x);
+      A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
 
   CU_CHECK(cudaEventRecord(stop, stream));
   CU_CHECK(cudaEventSynchronize(stop));
@@ -127,26 +132,26 @@ void matMul() {
       cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream));
   CU_CHECK(cudaStreamSynchronize(stream));
 
-  printf("\nMatrix A (%d x %d):\n", dimsA.x, dimsA.y);
-  for (int i = 0; i < size_A; i++) {
-    printf("%4.1f ", A_h[i]);
-    if ((i + 1) % dimsA.x == 0)
-      printf("\n");
-  }
-
-  printf("\nMatrix B (%d x %d):\n", dimsB.x, dimsB.y);
-  for (int i = 0; i < size_B; i++) {
-    printf("%4.1f ", B_h[i]);
-    if ((i + 1) % dimsB.x == 0)
-      printf("\n");
-  }
-
-  printf("\nMatrix C = A * B (%d x %d):\n", dimsC.x, dimsC.y);
-  for (int i = 0; i < size_C; i++) {
-    printf("%6.2f ", C_h[i]);
-    if ((i + 1) % dimsC.x == 0)
-      printf("\n");
-  }
+  // printf("\nMatrix A (%d x %d):\n", dimsA.x, dimsA.y);
+  // for (int i = 0; i < size_A; i++) {
+  //   printf("%4.1f ", A_h[i]);
+  //   if ((i + 1) % dimsA.x == 0)
+  //     printf("\n");
+  // }
+  //
+  // printf("\nMatrix B (%d x %d):\n", dimsB.x, dimsB.y);
+  // for (int i = 0; i < size_B; i++) {
+  //   printf("%4.1f ", B_h[i]);
+  //   if ((i + 1) % dimsB.x == 0)
+  //     printf("\n");
+  // }
+  //
+  // printf("\nMatrix C = A * B (%d x %d):\n", dimsC.x, dimsC.y);
+  // for (int i = 0; i < size_C; i++) {
+  //   printf("%6.2f ", C_h[i]);
+  //   if ((i + 1) % dimsC.x == 0)
+  //     printf("\n");
+  // }
 
   // free memory
   cudaFreeHost(A_h);
@@ -161,6 +166,6 @@ void matMul() {
 int main() {
   std::cout << "[CUDA] Launching matrix multiplication kernel...\n";
   matMul();
-  std::cout << "\nFinished!" << std::endl;
+  std::cout << "\n[END]" << std::endl;
   return 0;
 }

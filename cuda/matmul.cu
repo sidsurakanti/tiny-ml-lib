@@ -4,8 +4,8 @@
 #include <iostream>
 
 // ** lowk this file has a lot of dumb comments but that's js me thinking
-// through the code
-// ** feel free to ignore it
+// ** feel free to ignore it it's a whole yap city down there
+// also prolly the messiest file i've ever written
 
 // BIG IDEA:
 // set up matrices
@@ -22,11 +22,8 @@ void matInit(float *mat, int size, int n) {
   }
 }
 
-// TODO: use shared memory to make this faster
-template <int block_size>
-// (m, n) * (n, k) = (m, k)
-__global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
-                             int k) {
+__global__ void SlowMatMulKernel(float *A, float *B, float *C, int m, int n,
+                                 int k) {
   // NOTE: y for rows (vertical) in cuda and x (horiz) for cols
   int offsetY = blockDim.y * blockIdx.y;
   int offsetX = blockDim.x * blockIdx.x;
@@ -46,21 +43,97 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
     return;
 
   float sum = 0.0f;
+  // NOTE: have to index by row major bc everything is 1D
   for (int i = 0; i < n; i++) {
-    // NOTE: have to index by row major bc everything is 1D
     sum += A[row * n + i] * B[k * i + col];
   }
 
   C[row * k + col] = sum;
-  // printf("%f row: %d, col: %d, %f, %f\n ", cSum, row, col, A[wA * row + 1],
-  //        B[wB * 1 + col]);
+}
+
+template <int block_size>
+// (m, n) * (n, k) = (m, k)
+__global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
+                             int k) {
+  int offsetY = blockDim.y * blockIdx.y;
+  int offsetX = blockDim.x * blockIdx.x;
+  int row = threadIdx.y + offsetY;
+  int col = threadIdx.x + offsetX;
+
+  // clang-format off
+  //
+  // BIG IDEA:
+  // we load partial 16x16 tiles of A and B into shared memory for each element of C contained in the 16x16 thread block; 
+  // then we perform partial mat mul;
+  // we keep doing this until we can iterate thru all (n) rows in A and (n) cols in B; 
+  // at which point we'll have fully completed the matrix mul for a 16x16 block of C;
+  //
+  // ===========
+  // PSUEDO CODE # i dont think anyone except me can understand the bullshit below this line
+  //
+  // tile iters = ceil(n/blocksize)
+  //
+  // each thread (an element of C) of the 16x16 block loads
+  // their row/col to shared mem: 
+  // a[1d row idx + (t * block_size + tx)] & 
+  // b[k * (t * block_size + ty) + col]
+  //
+  // sync the threads so that both BLOCKSIZE*BLOCKSIZE blocks of A & B are
+  // loaded in shared mem for the SM;
+  //
+  // perform partial matrix mul
+  // tileA[ty][k:0->15] tileB[k:0->15][tx]!
+  //
+  // add to accum
+  // sync threads again
+
+  __shared__ float tileA[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ float tileB[BLOCK_SIZE][BLOCK_SIZE];
+
+  int iters = (n + block_size - 1) / block_size;
+  int ty = threadIdx.y;
+  int tx = threadIdx.x;
+
+  float sum = 0.0f;
+
+  for (int t = 0; t < iters; t++) {
+    // check if the element we're accessing is out of bounds in the matrix;
+    if ((block_size * t + tx < n) && (row < m))
+      tileA[ty][tx] = A[row * n + (t * block_size + tx)];
+    else 
+      tileA[ty][tx] = 0.0f;
+
+    if ((block_size * t + ty < n) && (col < k)) 
+      tileB[ty][tx] = B[k * (t * block_size + ty) + col];
+    else 
+      tileB[ty][tx] = 0.0f;
+
+    __syncthreads();
+
+    // perform mat mul
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+      sum += tileA[ty][i] * tileB[i][tx];
+    }
+
+    // sync threads before we pull next tile into shared memory
+    __syncthreads();
+  }
+
+  // bounds check here also
+  if (row < m && col < k) 
+    C[row * k + col] = sum;
 }
 
 void matMul() {
   // set up data
-  dim3 dimsA(60000, 784);
-  dim3 dimsB(784, 258);
+  // m, n
+  // n, k
+  dim3 dimsA(8193, 4099);
+  dim3 dimsB(4099, 16385);
   dim3 dimsC(dimsA.x, dimsB.y);
+
+  printf("[OPERATION] (%d, %d) * (%d, %d)\n", dimsA.x, dimsA.y, dimsA.y,
+         dimsB.y);
 
   unsigned int size_A = dimsA.x * dimsA.y;
   unsigned int size_B = dimsB.x * dimsB.y;
@@ -95,17 +168,40 @@ void matMul() {
   CU_CHECK(
       cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream));
 
-  printf("[OPERATION] (%d, %d) * (%d, %d)\n", dimsA.x, dimsA.y, dimsA.y,
-         dimsB.y);
 
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
   unsigned int gridRows = (dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE;
   unsigned int gridCols = (dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE;
   dim3 gridSize(gridCols, gridRows); // blocks per grid
 
+  printf("[WARMING UP GPU]\n");
+  // warm up runs 
+  SlowMatMulKernel<<<gridSize, blockSize, 1, stream>>>(
+      A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
+  MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
+      A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
+
   cudaEvent_t start, stop;
+  float elapsed;
   CU_CHECK(cudaEventCreate(&start));
   CU_CHECK(cudaEventCreate(&stop));
+
+  printf("[RUNNING] SlowMatMul\n");
+  CU_CHECK(cudaEventRecord(start, stream));
+
+  // <<<blocks in grid, block size (threads in block), dynamic shared mem,
+  // gpu stream to run on>>>
+  // NOTE: m = dimsA.x, n = dimsA.y, k = dimsB.y
+  SlowMatMulKernel<<<gridSize, blockSize, 1, stream>>>(
+      A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
+
+  CU_CHECK(cudaEventRecord(stop, stream));
+  CU_CHECK(cudaEventSynchronize(stop));
+  CU_CHECK(cudaEventElapsedTime(&elapsed, start, stop));
+  printf("[TIME] SlowMatMul completed in %.3fms.\n", elapsed);
+
+
+  printf("[RUNNING] FastMatMul\n");
   CU_CHECK(cudaEventRecord(start, stream));
 
   // <<<blocks in grid, block size (threads in block), dynamic shared mem,
@@ -116,10 +212,9 @@ void matMul() {
 
   CU_CHECK(cudaEventRecord(stop, stream));
   CU_CHECK(cudaEventSynchronize(stop));
-
-  float elapsed;
   CU_CHECK(cudaEventElapsedTime(&elapsed, start, stop));
-  printf("[TIME] Completed in %.4gms.\n", elapsed);
+  printf("[TIME] FastMatMul completed in %.3fms.\n", elapsed);
+
 
   CU_CHECK(cudaEventDestroy(start));
   CU_CHECK(cudaEventDestroy(stop));
@@ -135,21 +230,21 @@ void matMul() {
   // printf("\nMatrix A (%d x %d):\n", dimsA.x, dimsA.y);
   // for (int i = 0; i < size_A; i++) {
   //   printf("%4.1f ", A_h[i]);
-  //   if ((i + 1) % dimsA.x == 0)
+  //   if ((i + 1) % dimsA.y == 0)
   //     printf("\n");
   // }
   //
   // printf("\nMatrix B (%d x %d):\n", dimsB.x, dimsB.y);
   // for (int i = 0; i < size_B; i++) {
   //   printf("%4.1f ", B_h[i]);
-  //   if ((i + 1) % dimsB.x == 0)
+  //   if ((i + 1) % dimsB.y == 0)
   //     printf("\n");
   // }
   //
   // printf("\nMatrix C = A * B (%d x %d):\n", dimsC.x, dimsC.y);
   // for (int i = 0; i < size_C; i++) {
   //   printf("%6.2f ", C_h[i]);
-  //   if ((i + 1) % dimsC.x == 0)
+  //   if ((i + 1) % dimsC.y == 0)
   //     printf("\n");
   // }
 
@@ -165,6 +260,9 @@ void matMul() {
 
 int main() {
   std::cout << "[CUDA] Launching matrix multiplication kernel...\n";
+
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 0);
   matMul();
   std::cout << "\n[END]" << std::endl;
   return 0;

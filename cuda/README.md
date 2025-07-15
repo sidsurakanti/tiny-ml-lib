@@ -42,18 +42,32 @@ Matrix C = A * B (10 x 7):
 [END]
 ```
 
-RESULTS FROM UPGRADE TO SHARED MEMORY:
-1.275x speed up (lowk should be more from what i've read i'm not sure why the speed up was so low)
+### RESULTS FROM UPGRADE TO SHARED MEMORY:
+- 1.3x speed up with shared memory optimizations 
+- 5800x from cpu (10x from numpy)
+
 ```bash
 >>> ./matmul
 
 [CUDA] Launching matrix multiplication kernel...
-[OPERATION] (8193, 4099) * (4099, 16385)
+[OPERATION] (2048, 2048) * (2048, 2048)
 [WARMING UP GPU]
 [RUNNING] SlowMatMul
-[TIME] SlowMatMul completed in 1253.076ms.
+[TIME] SlowMatMul completed in 19.85ms.
 [RUNNING] FastMatMul
-[TIME] FastMatMul completed in 982.414ms.
+[TIME] FastMatMul completed in 16.02ms.
+[TIME] CPU finished in 92993ms.
 [END]
 ```
+```bash
+>>> ./matmul
 
+[CUDA] Launching matrix multiplication kernel...
+[OPERATION] (16384, 8192) * (8192, 32768)
+[WARMING UP GPU]
+[RUNNING] SlowMatMul
+[TIME] SlowMatMul completed in 9569.36ms.
+[RUNNING] FastMatMul
+[TIME] FastMatMul completed in 7426.05ms.
+[END]
+```

@@ -1,5 +1,7 @@
 #include "errors.cuh"
+#include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cuda_runtime.h>
 #include <iostream>
 
@@ -14,11 +16,21 @@
 // do matmul
 // cpy back to host
 
-#define BLOCK_SIZE 16
+const bool DEBUG = false;
+const int BLOCK_SIZE = 16;
+const bool CPU = false;
 
 void matInit(float *mat, int size, int n) {
   for (int i = 0; i < size; i++) {
     mat[i] = n;
+  }
+}
+
+void printMat(float *mat, int size, int colWidth) {
+  for (int i = 0; i < size; i++) {
+    printf("%6.2f ", mat[i]);
+    if ((i + 1) % colWidth == 0)
+      printf("\n");
   }
 }
 
@@ -62,7 +74,7 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
 
   // clang-format off
   //
-  // BIG IDEA:
+  // NOTE: BIG IDEA:
   // we load partial 16x16 tiles of A and B into shared memory for each element of C contained in the 16x16 thread block; 
   // then we perform partial mat mul;
   // we keep doing this until we can iterate thru all (n) rows in A and (n) cols in B; 
@@ -124,12 +136,27 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
     C[row * k + col] = sum;
 }
 
+void cpuMatMul(float *A, float *B, float *C, int m, int n, int k) {
+  for (int row = 0; row < m; row++) {
+    for (int col = 0; col < k; col++) {
+      for (int i = 0; i < n; i++) {
+        C[row * k + col] += A[row * n + i] * B[k * i + col];
+      }
+    }
+  }
+}
+
 void matMul() {
   // set up data
+
   // m, n
   // n, k
-  dim3 dimsA(8193, 4099);
-  dim3 dimsB(4099, 16385);
+  // dim3 dimsA(8, 5);
+  // dim3 dimsB(5, 10);
+  // dim3 dimsA(2048, 2048);
+  // dim3 dimsB(2048, 2048);
+  dim3 dimsA(16384, 8192);
+  dim3 dimsB(8192, 32768);
   dim3 dimsC(dimsA.x, dimsB.y);
 
   printf("[OPERATION] (%d, %d) * (%d, %d)\n", dimsA.x, dimsA.y, dimsA.y,
@@ -181,6 +208,8 @@ void matMul() {
   MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
       A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
 
+  CU_CHECK(cudaStreamSynchronize(stream));
+
   cudaEvent_t start, stop;
   float elapsed;
   CU_CHECK(cudaEventCreate(&start));
@@ -198,7 +227,7 @@ void matMul() {
   CU_CHECK(cudaEventRecord(stop, stream));
   CU_CHECK(cudaEventSynchronize(stop));
   CU_CHECK(cudaEventElapsedTime(&elapsed, start, stop));
-  printf("[TIME] SlowMatMul completed in %.3fms.\n", elapsed);
+  printf("[TIME] SlowMatMul completed in %.2fms.\n", elapsed);
 
 
   printf("[RUNNING] FastMatMul\n");
@@ -213,12 +242,13 @@ void matMul() {
   CU_CHECK(cudaEventRecord(stop, stream));
   CU_CHECK(cudaEventSynchronize(stop));
   CU_CHECK(cudaEventElapsedTime(&elapsed, start, stop));
-  printf("[TIME] FastMatMul completed in %.3fms.\n", elapsed);
-
+  printf("[TIME] FastMatMul completed in %.2fms.\n", elapsed);
 
   CU_CHECK(cudaEventDestroy(start));
   CU_CHECK(cudaEventDestroy(stop));
 
+
+  // wait host thread & error check
   CU_CHECK(cudaGetLastError());
   CU_CHECK(cudaStreamSynchronize(stream));
 
@@ -227,26 +257,27 @@ void matMul() {
       cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream));
   CU_CHECK(cudaStreamSynchronize(stream));
 
-  // printf("\nMatrix A (%d x %d):\n", dimsA.x, dimsA.y);
-  // for (int i = 0; i < size_A; i++) {
-  //   printf("%4.1f ", A_h[i]);
-  //   if ((i + 1) % dimsA.y == 0)
-  //     printf("\n");
-  // }
-  //
-  // printf("\nMatrix B (%d x %d):\n", dimsB.x, dimsB.y);
-  // for (int i = 0; i < size_B; i++) {
-  //   printf("%4.1f ", B_h[i]);
-  //   if ((i + 1) % dimsB.y == 0)
-  //     printf("\n");
-  // }
-  //
-  // printf("\nMatrix C = A * B (%d x %d):\n", dimsC.x, dimsC.y);
-  // for (int i = 0; i < size_C; i++) {
-  //   printf("%6.2f ", C_h[i]);
-  //   if ((i + 1) % dimsC.y == 0)
-  //     printf("\n");
-  // }
+  if (DEBUG) {
+    printf("\n[MAT A] (%d x %d):\n", dimsA.x, dimsA.y);
+    printMat(A_h, size_A, dimsA.y);
+
+    printf("\n[MAT B] (%d x %d):\n", dimsB.x, dimsB.y);
+    printMat(B_h, size_B, dimsB.y);
+
+    printf("\n[MAT C = A * B] (%d x %d):\n", dimsC.x, dimsC.y);
+    printMat(C_h, size_C, dimsC.y);
+  }
+
+  if (CPU) {
+    float* C = (float*)calloc(size_C, sizeof(float));
+
+    auto s = std::chrono::high_resolution_clock::now();
+    cpuMatMul(A_h, B_h, C, dimsA.x, dimsA.y, dimsB.y);
+    auto e = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(e - s);
+    printf("[TIME] CPU finished in %ldms.\n", duration.count());
+    if (DEBUG) printMat(C, size_C, dimsC.y);
+  }
 
   // free memory
   cudaFreeHost(A_h);
@@ -264,6 +295,7 @@ int main() {
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
   matMul();
-  std::cout << "\n[END]" << std::endl;
+
+  std::cout << "[END]" << std::endl;
   return 0;
 }

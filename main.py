@@ -9,6 +9,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from losses import CrossEntropyLoss, MSELoss
+import native
+
+print(native.hello("main.py", 1))
 
 # MNIST
 # just download mnist into /dataset/* and change file names to match

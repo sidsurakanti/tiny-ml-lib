@@ -133,8 +133,6 @@ Accuracy: 98.13%
 
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=white)  
 ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)  
-![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)  
-![Matplotlib](https://img.shields.io/badge/matplotlib-%23ffffff.svg?style=for-the-badge&logo=matplotlib&logoColor=black)
 
 ## Getting Started
 
@@ -142,7 +140,9 @@ Accuracy: 98.13%
 
 - Python 3.8+
 - pip
-- Cuda Toolkit (optional)
+- CUDA Toolkit 
+- CMake
+- gcc or g++
 
 ### Installation
 
@@ -164,6 +164,14 @@ Install dependencies:
 
 ```bash
 pip install -r requirements.txt
+```
+
+Build core cuda lib
+```bash
+mkdir build && cd build
+cmake ..
+make 
+make install
 ```
 
 Run the app

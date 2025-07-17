@@ -11,7 +11,11 @@ import matplotlib.pyplot as plt
 from losses import CrossEntropyLoss, MSELoss
 import native
 
-print(native.hello("main.py", 1))
+m, n, k = 10, 20, 10
+a = np.random.randn(m, n).reshape(m * n)
+b = np.random.randn(n, k).reshape(k * n)
+c = native.matmul(a, b, m, n, k)
+print(type(c), c.shape, c)
 
 # MNIST
 # just download mnist into /dataset/* and change file names to match

@@ -42,7 +42,7 @@ Matrix C = A * B (10 x 7):
 [END]
 ```
 
-### RESULTS FROM UPGRADE TO SHARED MEMORY:
+## Results from upgrade to shared memory:
 - 1.3x speed up with shared memory optimizations 
 - 5800x from cpu (10x from numpy)
 

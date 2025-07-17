@@ -4,6 +4,11 @@
 #include <cstdlib>
 #include <cuda_runtime.h>
 #include <iostream>
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+
+namespace py = pybind11;
 
 // ** lowk this file has a lot of dumb comments but that's js me thinking
 // ** feel free to ignore it it's a whole yap city down there
@@ -31,6 +36,16 @@ void printMat(float *mat, int size, int colWidth) {
     printf("%6.2f ", mat[i]);
     if ((i + 1) % colWidth == 0)
       printf("\n");
+  }
+}
+
+void cpuMatMul(float *A, float *B, float *C, int m, int n, int k) {
+  for (int row = 0; row < m; row++) {
+    for (int col = 0; col < k; col++) {
+      for (int i = 0; i < n; i++) {
+        C[row * k + col] += A[row * n + i] * B[k * i + col];
+      }
+    }
   }
 }
 
@@ -136,18 +151,78 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
     C[row * k + col] = sum;
 }
 
-void cpuMatMul(float *A, float *B, float *C, int m, int n, int k) {
-  for (int row = 0; row < m; row++) {
-    for (int col = 0; col < k; col++) {
-      for (int i = 0; i < n; i++) {
-        C[row * k + col] += A[row * n + i] * B[k * i + col];
-      }
-    }
-  }
+typedef typename py::array_t<float, py::array::c_style | py::array::forcecast> py_ndarray_t;
+
+py::array matMulNp(
+  py_ndarray_t A,
+  py_ndarray_t B,
+  int m, int n, int k
+) {
+  unsigned int size_A = m * n;
+  unsigned int size_B = n * k;
+  unsigned int size_C = m * k;
+
+  unsigned int mem_sizeA = sizeof(float) * size_A;
+  unsigned int mem_sizeB = sizeof(float) * size_B;
+  unsigned int mem_sizeC = sizeof(float) * size_C;
+
+  // unchecked is better than arr.request() for buf & then buf.ptr() 
+  // cus it auto throws when given more than 1d
+  const float* A_h = A.unchecked<1>().data(0); // ptr to A[0]
+  const float* B_h = B.unchecked<1>().data(0); 
+  float* C_h = (float*)calloc(m * k, sizeof(float));
+
+  float* A_d, *B_d, *C_d;
+
+  CU_CHECK(cudaMalloc(&A_d, mem_sizeA));
+  CU_CHECK(cudaMalloc(&B_d, mem_sizeB));
+  CU_CHECK(cudaMalloc(&C_d, mem_sizeC));
+
+  cudaStream_t stream;
+  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+
+  CU_CHECK(
+      cudaMemcpyAsync(A_d, A_h, mem_sizeA, cudaMemcpyHostToDevice, stream));
+  CU_CHECK(
+      cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream));
+
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (k + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridSize(gridCols, gridRows); // blocks per grid
+  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
+      A_d, B_d, C_d, m, n, k);
+
+  // wait host thread & error check
+  CU_CHECK(cudaGetLastError());
+  CU_CHECK(cudaStreamSynchronize(stream));
+
+  // copy result back to host
+  CU_CHECK(
+      cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream));
+  CU_CHECK(cudaStreamSynchronize(stream));
+
+  cudaFree(A_d);
+  cudaFree(B_d);
+  cudaFree(C_d);
+  cudaStreamDestroy(stream);
+
+  // wrap the c ptr in a capsule with a destructor so we can safely pass it around
+  // we need to do this so when python destruct's its capsule obj we auto free the memory for the c ptr
+  py::capsule free_when_done(C_h, [](void *ptr) { free(ptr); });
+  py::array_t<float> result = py::array_t<float>(
+    {m, k}, // shape
+    C_h, // data ptr
+    free_when_done
+  );
+
+  return result;
+
 }
 
 void matMul() {
-  // set up data
+  // SET UP DATA
 
   // m, n
   // n, k
@@ -195,11 +270,10 @@ void matMul() {
   CU_CHECK(
       cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream));
 
-
-  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
   unsigned int gridRows = (dimsC.x + BLOCK_SIZE - 1) / BLOCK_SIZE;
   unsigned int gridCols = (dimsC.y + BLOCK_SIZE - 1) / BLOCK_SIZE;
   dim3 gridSize(gridCols, gridRows); // blocks per grid
+  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   printf("[WARMING UP GPU]\n");
   // warm up runs 
@@ -247,7 +321,6 @@ void matMul() {
   CU_CHECK(cudaEventDestroy(start));
   CU_CHECK(cudaEventDestroy(stop));
 
-
   // wait host thread & error check
   CU_CHECK(cudaGetLastError());
   CU_CHECK(cudaStreamSynchronize(stream));
@@ -258,13 +331,13 @@ void matMul() {
   CU_CHECK(cudaStreamSynchronize(stream));
 
   if (DEBUG) {
-    printf("\n[MAT A] (%d x %d):\n", dimsA.x, dimsA.y);
+    printf("\n[MAT A] (%dx%d):\n", dimsA.x, dimsA.y);
     printMat(A_h, size_A, dimsA.y);
 
-    printf("\n[MAT B] (%d x %d):\n", dimsB.x, dimsB.y);
+    printf("\n[MAT B] (%dx%d):\n", dimsB.x, dimsB.y);
     printMat(B_h, size_B, dimsB.y);
 
-    printf("\n[MAT C = A * B] (%d x %d):\n", dimsC.x, dimsC.y);
+    printf("\n[MAT C = A * B] (%dx%d):\n", dimsC.x, dimsC.y);
     printMat(C_h, size_C, dimsC.y);
   }
 
@@ -277,6 +350,8 @@ void matMul() {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(e - s);
     printf("[TIME] CPU finished in %ldms.\n", duration.count());
     if (DEBUG) printMat(C, size_C, dimsC.y);
+
+    free(C);
   }
 
   // free memory
@@ -294,8 +369,29 @@ int main() {
 
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
+
+  std::cout << "[DEVICE INFO]" << std::endl;
+  std::cout << "DEVICE: " << prop.name << std::endl;
+  std::cout << "SM COUNT: " << prop.multiProcessorCount << std::endl;
+  std::cout << "MAX THREADS / BLOCK: " << prop.maxThreadsPerBlock << std::endl;
+  std::cout << "WARP SIZE: " << prop.warpSize << std::endl;
+  std::cout << "SHARED MEMORY / BLOCK: " << prop.sharedMemPerBlock / (1024) << "KB" << std::endl;
+  std::cout << "GLOBAL MEMORY: " << prop.totalGlobalMem / (1024*1024*1024) << "GB" << std::endl;
+
   matMul();
 
   std::cout << "[END]" << std::endl;
   return 0;
+}
+
+void init_matmul(py::module_ &m) {
+  m.def("matmul", &matMulNp,
+    "Matrix multiplication: A @ B = C\n"
+    "Args:\n"
+    "  A: 1D array, shape (m*n) representing (m, n) matrix in row-major order\n"
+    "  B: 1D array, shape (n*k) representing (n, k) matrix in row-major order\n"
+    "  m, n, k: matrix dimensions\n"
+    "Returns:\n"
+    "  C: 2D array, shape (m, k)"
+  );
 }

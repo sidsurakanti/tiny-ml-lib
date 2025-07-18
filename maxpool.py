@@ -1,28 +1,28 @@
 import numpy as np
-import numpy.typing as npt
 from defs import Array
 from layer import Layer
 from math import ceil
 
+
 class MaxPool(Layer):
     def __init__(self) -> None:
         self._X = None
-        self.mask = None
+        self.mask = np.zeros((0, 0))
         self.arg_idxs = []
 
     def forward(self, X: Array):
         self.X = X
         # presume x is of (5, 3, 28, 28)
         filters, channels, h, w = self.X.shape
-        nh, nw = ceil(h/2), ceil(w/2)
+        nh, nw = ceil(h / 2), ceil(w / 2)
         res = np.zeros((filters, channels, nh, nw))
-        
+
         # padded = np.pad(self.X, [(0, 0), (0, 0), (0, h%2), (0, w%2)], mode='constant')
 
         # can prob do this all w np but yea
         for f in range(filters):
             for c in range(channels):
-                view = self.X[f, c] # 28x28
+                view = self.X[f, c]  # 28x28
 
                 for i in range(nh):
                     for j in range(nw):
@@ -32,17 +32,17 @@ class MaxPool(Layer):
                         pooler = view[i0:i1, j0:j1]
                         res[f, c, i, j] = np.max(pooler)
 
-                        # set the backwards mask while at it 
+                        # set the backwards mask while at it
                         idx = np.unravel_index(np.argmax(pooler), pooler.shape)
                         self.arg_idxs.append([f, c, i0 + idx[0], j0 + idx[1]])
                         # self.mask[f, c, i0 + idx[0], j0 + idx[1]] = 1
 
         return res
 
-    def backwards(self, dZ):
+    def backwards(self, dZ) -> Array:
         idxs = np.array(self.arg_idxs).T
         self.mask[tuple(idxs)] = dZ.flatten()
-        self.arg_idxs = [] # reset 
+        self.arg_idxs = []  # reset
         return self.mask
 
     @property
@@ -68,6 +68,3 @@ if __name__ == "__main__":
     dz = np.ones_like(res)
     dx = pool.backwards(dz)
     print(dx)
-
-
-

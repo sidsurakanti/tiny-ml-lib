@@ -9,13 +9,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from losses import CrossEntropyLoss, MSELoss
-import native
-
-m, n, k = 10, 20, 10
-a = np.random.randn(m, n).reshape(m * n)
-b = np.random.randn(n, k).reshape(k * n)
-c = native.matmul(a, b, m, n, k)
-print(type(c), c.shape, c)
 
 # MNIST
 # just download mnist into /dataset/* and change file names to match
@@ -45,7 +38,6 @@ def main():
     fc = Linear(n, 10)  # (10, 784) * (784, m) -> (10, m)
     a = ReLU()  # output-> (10, m)
     fc2 = Linear(10, 10)
-    # 28 should acc be sqrt(n) but i dont feel like generalizing
     conv2d = Conv2d((1, 28, 28), 5, 3)
 
     # out = conv2d.forward(cX_train)
@@ -57,33 +49,36 @@ def main():
     loss_fn = CrossEntropyLoss()
     # loss_fn = MSELoss()
 
-    # sequence = [
-    #       Linear(784, 256),
-    #       ReLU(),
-    #       Linear(256, 256),
-    #       ReLU(),
-    #       Linear(256, 10)
-    #     ]
-
-    # i dont wanna train a bigger model on my buns macbook cpu 🥀
     sequence = [
-        Conv2d((1, 28, 28), 5, 5),
+        Linear(784, 1024),
         ReLU(),
-        # MaxPool(),
-        Flatten(),
-        Linear(24 * 24 * 5, 128),
+        Linear(1024, 1024),
         ReLU(),
-        Linear(128, 10),
+        Linear(1024, 1024),
+        ReLU(),
+        Linear(1024, 1024),
+        ReLU(),
+        Linear(1024, 10),
     ]
+
+    # sequence = [
+    #     Conv2d((1, 28, 28), 5, 5),
+    #     ReLU(),
+    #     # MaxPool(),
+    #     Flatten(),
+    #     Linear(24 * 24 * 5, 128),
+    #     ReLU(),
+    #     Linear(128, 10),
+    # ]
 
     model = Model(sequence, loss_fn)
     # model.load("mlp-weights.pkl")
 
-    # model(25, X_train, y_train, learning_rate=0.01, batch_size=32, timed=1)
-    model(10, cX_train, y_train, batch_size=32, timed=True)
+    model(10, X_train, y_train, learning_rate=0.01, batch_size=512, timed=1)
+    # model(10, cX_train, y_train, batch_size=32, timed=True)
 
-    # acc = model.evaluate(X_test, y_test)
-    acc = model.evaluate(cX_test, y_test)
+    acc = model.evaluate(X_test, y_test)
+    # acc = model.evaluate(cX_test, y_test)
     print(f"Accuracy: {acc*100:.2f}%")
 
     if input("\nSave weights? (y/n) >>> ").lower() in ("y", "yes"):

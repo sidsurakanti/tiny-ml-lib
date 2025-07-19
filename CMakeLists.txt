@@ -5,6 +5,7 @@ set(CMAKE_CUDA_ARCHITECTURES 89)
 
 # for lsp
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 
 set(PYBIND11_FINDPYTHON NEW)
 
@@ -12,7 +13,8 @@ add_subdirectory(extern/pybind11)
 
 pybind11_add_module(lib
   cuda/lib.cpp
-  cuda/matmul.cu 
+  cuda/core.cu
+  cuda/matmul.cu
   cuda/hello.cpp
 )
 

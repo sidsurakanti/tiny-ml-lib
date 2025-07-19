@@ -74,8 +74,8 @@ def main():
     model = Model(sequence, loss_fn)
     # model.load("mlp-weights.pkl")
 
-    model(10, X_train, y_train, learning_rate=0.01, batch_size=512, timed=1)
-    # model(10, cX_train, y_train, batch_size=32, timed=True)
+    model(10, X_train, y_train, learning_rate=0.01, batch_size=512)
+    # model(10, cX_train, y_train, batch_size=32)
 
     acc = model.evaluate(X_test, y_test)
     # acc = model.evaluate(cX_test, y_test)

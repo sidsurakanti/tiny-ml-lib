@@ -19,11 +19,11 @@ def softmax(logits):
 class MSELoss:
     def __init__(self):
         self.probs = None
+        self.targets = None
 
     def loss(self, logits, truth):
         probs = softmax(logits)
         targets = one_hot(logits.shape[1], truth)
-        m = logits.shape[0]
 
         # cache it for backprop
         self.probs = probs
@@ -48,6 +48,7 @@ class MSELoss:
 class CrossEntropyLoss:
     def __init__(self):
         self.probs = None
+        self.targets = None
 
     def loss(self, logits, truth):
         _, n = logits.shape  # m, n
@@ -69,7 +70,7 @@ class CrossEntropyLoss:
         dZ = self.probs - self.targets
         return dZ
 
-    def __call__(self, *args, **kwds):
+    def __call__(self, *args):
         return self.loss(*args)
 
     def __repr__(self) -> str:

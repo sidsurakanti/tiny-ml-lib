@@ -5,131 +5,146 @@ from math import ceil
 from datetime import datetime
 import pickle
 
+
 class Model:
-  def __init__(self, sequence: Sequence, loss_fn) -> None:
-    self.sequence = sequence
-    self.loss = loss_fn
+    def __init__(self, sequence: Sequence, loss_fn) -> None:
+        self.sequence = sequence
+        self.loss = loss_fn
 
-  def forward(self, X: Array, y: Array, *args, **kwargs):
-    out = X
-    for layer in self.sequence:
-      out = layer.forward(out)
-    loss = self.loss(out, y) 
-    return (out, loss)
+    def forward(self, X: Array, y: Array):
+        out = X
+        for layer in self.sequence:
+            out = layer.forward(out)
+        loss = self.loss(out, y)
+        return (out, loss)
 
-  def backwards(self, *args, **kwargs):
-    dZ = self.loss.backwards()
-    for layer in reversed(self.sequence):
-      # print(layer.__repr__(), dZ.shape)
-      dZ = layer.backwards(dZ)
-    return dZ
-  
-  def step(self, learning_rate: int):
-    for layer in self.sequence:
-      if hasattr(layer, "step"):
-        layer.step(learning_rate=learning_rate)
+    def backwards(self):
+        dZ = self.loss.backwards()
+        for layer in reversed(self.sequence):
+            # print(layer.__repr__(), dZ.shape)
+            dZ = layer.backwards(dZ)
+        return dZ
 
-  def fit(self, epochs: int = 5, *args, timed: bool = True, **kwargs):
-    print(self)
+    def step(self, learning_rate: float):
+        for layer in self.sequence:
+            if hasattr(layer, "step"):
+                layer.step(learning_rate=learning_rate)
 
-    print("\nTRAINING...")
-    start_time = datetime.now()    
-    for epoch in range(epochs):
-      loss = self.train(*args, **kwargs)
-      print(f"EPOCH {epoch + 1}/{epochs}, Loss: {loss:.4f}")
-    print(f"Time spent training: {(datetime.now() - start_time).total_seconds():.2f}s")
+    def train(
+        self, X: Array, y: Array, learning_rate: float = 0.01, batch_size: int = 0
+    ):
+        batches = Batcher((X, y), batch_size)
+        total_batches = len(batches)
 
-    return 
+        for i, (x, y) in enumerate(batches, start=1):
+            _, loss = self.forward(x, y)
+            self.backwards()
+            if i % ceil(total_batches / 4) == 0 or i == total_batches:
+                print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}", end="\r")
 
-  def train(self, X: Array, y: Array, learning_rate: int = 0.01, batch_size: int = 0):  
-    batches = Batcher((X, y), batch_size)
-    total_batches = len(batches)
+            self.step(learning_rate)
+        return loss
 
-    for i, (x, y) in enumerate(batches, start=1):
-      _, loss = self.forward(x, y)
-      self.backwards()
-      if i % ceil(total_batches / 4) == 0 or i == total_batches:
-        print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}", end="\r")
+    def fit(self, epochs: int = 5, *args, **kwargs):
+        print(self)
 
-      self.step(learning_rate)
-    return loss
+        print("\nTRAINING...")
+        start_time = datetime.now()
+        for epoch in range(epochs):
+            loss = self.train(*args, **kwargs)
+            print(f"EPOCH {epoch + 1}/{epochs}, Loss: {loss:.4f}")
+        print(
+            f"Time spent training: {(datetime.now() - start_time).total_seconds():.2f}s"
+        )
 
-  def evaluate(self, X_test: Array, y_test: Array):
-    print("\nEVALUATING...")
-    indices = np.random.permutation(len(X_test))
-    X_test, y_test = X_test[indices], y_test[indices]
+        return
 
-    out, _ = self.forward(X_test, y_test)
-    preds = np.argmax(out, axis=1)
-    correct = np.sum(preds == y_test)
-    r = np.random.randint(0, preds.shape[0])
+    def evaluate(self, X_test: Array, y_test: Array):
+        print("\nEVALUATING...")
+        indices = np.random.permutation(len(X_test))
+        X_test, y_test = X_test[indices], y_test[indices]
 
-    print("Sample labels:", y_test[r:r+10])
-    print("Sample preds:", preds[r:r+10])
+        out, _ = self.forward(X_test, y_test)
+        preds = np.argmax(out, axis=1)
+        correct = np.sum(preds == y_test)
+        r = np.random.randint(0, preds.shape[0])
 
-    total = y_test.shape[0]
-    return correct / total
+        print("Sample labels:", y_test[r : r + 10])
+        print("Sample preds:", preds[r : r + 10])
 
-  def predict(self, *args, **kwargs):
-    raise NotImplementedError("Model predict method not implemented.")
+        total = y_test.shape[0]
+        return correct / total
 
-  @property
-  def state_dict(self):
-    state = {
-            "weights": [l.get_weights() for l in self.sequence if hasattr(l, "get_weights")],
-            "arch": [(type(l).__name__, l.input_shape, l.output_shape) for l in self.sequence if hasattr(l, "input_shape")]
+    def predict(self, *args, **kwargs):
+        raise NotImplementedError("Model predict method not implemented.")
+
+    @property
+    def state_dict(self):
+        state = {
+            "weights": [
+                l.get_weights() for l in self.sequence if hasattr(l, "get_weights")
+            ],
+            "arch": [
+                (type(l).__name__, l.input_shape, l.output_shape)
+                for l in self.sequence
+                if hasattr(l, "input_shape")
+            ],
         }
 
-    return state
+        return state
 
-  def save(self, path: str = "model_weights.pkl"):
-    with open(path, "wb") as f:
-      pickle.dump(self.state_dict, f)
-    return print("Saved model weights to", path)
+    def save(self, path: str = "model_weights.pkl"):
+        with open(path, "wb") as f:
+            pickle.dump(self.state_dict, f)
+        return print("Saved model weights to", path)
 
-  def load(self, path: str):
-    with open(path, "rb") as f:
-        state_dict = pickle.load(f)
+    def load(self, path: str):
+        with open(path, "rb") as f:
+            state_dict = pickle.load(f)
 
-    assert state_dict["arch"] == self.state_dict["arch"], "Model type mismatch."
-    layers = [l for l in self.sequence if hasattr(l, "set_weights")]
+        assert state_dict["arch"] == self.state_dict["arch"], "Model type mismatch."
+        layers = [l for l in self.sequence if hasattr(l, "set_weights")]
 
-    for layer, weights in zip(layers, state_dict["weights"]): 
-      layer.set_weights(*weights)
+        for layer, weights in zip(layers, state_dict["weights"]):
+            layer.set_weights(*weights)
 
-    return print("Loaded model weights from", path)
+        return print("Loaded model weights from", path)
 
-  def __repr__(self):
-    lines = ["Model("]
-    total_params = 0
+    def __repr__(self):
+        lines = ["Model("]
+        total_params = 0
 
-    for i, layer in enumerate(self.sequence):
-      name = type(layer).__name__
-      has_shapes = hasattr(layer, "input_shape") and hasattr(layer, "output_shape")
+        for i, layer in enumerate(self.sequence):
+            name = type(layer).__name__
+            has_shapes = hasattr(layer, "input_shape") and hasattr(
+                layer, "output_shape"
+            )
 
-      if has_shapes:
-        in_shape = layer.input_shape
-        out_shape = layer.output_shape
-        shape_str = f" ({in_shape} → {out_shape})"
-      else:
-        shape_str = ""
+            if has_shapes:
+                in_shape = layer.input_shape
+                out_shape = layer.output_shape
+                shape_str = f" ({in_shape} → {out_shape})"
+            else:
+                shape_str = ""
 
-      lines.append(f"  [{i}] {name:<12}{shape_str}")
+            lines.append(f"  [{i}] {name:<12}{shape_str}")
 
-      if hasattr(layer, "get_weights"):
-        weights = layer.get_weights()
-        total_params += sum(np.prod(w.shape) for w in weights)
+            if hasattr(layer, "get_weights"):
+                weights = layer.get_weights()
+                total_params += sum(np.prod(w.shape) for w in weights)
 
-    lines.append(f"  Loss: {type(self.loss).__name__}")
-    lines.append(f"  Total parameters: {total_params:,}")
-    lines.append(")")
-    return "\n".join(lines)
+        lines.append(f"  Loss: {type(self.loss).__name__}")
+        lines.append(f"  Total parameters: {total_params:,}")
+        lines.append(")")
+        return "\n".join(lines)
 
-  def __call__(self, *args, **kwargs):
-    return self.fit(*args, **kwargs)
+    def __call__(self, *args, **kwargs):
+        return self.fit(*args, **kwargs)
+
 
 if __name__ == "__main__":
-  m = Model(1, 1)
-  print(dir(Model))
-  print(id(m), type(m).__name__)
-  # m.save()
+    pass
+    # m = Model(1, 1)
+    # print(dir(Model))
+    # print(id(m), type(m).__name__)
+    # m.save()

@@ -1,14 +1,10 @@
 #include "errors.cuh"
+#include "matmul.cuh"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
 #include <iostream>
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/pytypes.h>
-
-namespace py = pybind11;
 
 // ** lowk this file has a lot of dumb comments but that's js me thinking
 // ** feel free to ignore it it's a whole yap city down there
@@ -22,8 +18,8 @@ namespace py = pybind11;
 // cpy back to host
 
 const bool DEBUG = false;
-const int BLOCK_SIZE = 16;
 const bool CPU = false;
+const int BLOCK_SIZE = 16;
 
 void matInit(float *mat, int size, int n) {
   for (int i = 0; i < size; i++) {
@@ -49,8 +45,8 @@ void cpuMatMul(float *A, float *B, float *C, int m, int n, int k) {
   }
 }
 
-__global__ void SlowMatMulKernel(float *A, float *B, float *C, int m, int n,
-                                 int k) {
+__global__ void BasicMatMulKernel(float *A, float *B, float *C, int m, int n,
+                                  int k) {
   // NOTE: y for rows (vertical) in cuda and x (horiz) for cols
   int offsetY = blockDim.y * blockIdx.y;
   int offsetX = blockDim.x * blockIdx.x;
@@ -78,8 +74,8 @@ __global__ void SlowMatMulKernel(float *A, float *B, float *C, int m, int n,
   C[row * k + col] = sum;
 }
 
-template <int block_size>
 // (m, n) * (n, k) = (m, k)
+template <int block_size>
 __global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
                              int k) {
   int offsetY = blockDim.y * blockIdx.y;
@@ -151,81 +147,11 @@ __global__ void MatMulKernel(float *A, float *B, float *C, int m, int n,
     C[row * k + col] = sum;
 }
 
-typedef typename py::array_t<float, py::array::c_style | py::array::forcecast> py_ndarray_t;
-
-py::array matMulNp(
-  py_ndarray_t A,
-  py_ndarray_t B,
-  int m, int n, int k
-) {
-  unsigned int size_A = m * n;
-  unsigned int size_B = n * k;
-  unsigned int size_C = m * k;
-
-  unsigned int mem_sizeA = sizeof(float) * size_A;
-  unsigned int mem_sizeB = sizeof(float) * size_B;
-  unsigned int mem_sizeC = sizeof(float) * size_C;
-
-  // unchecked is better than arr.request() for buf & then buf.ptr() 
-  // cus it auto throws when given more than 1d
-  const float* A_h = A.unchecked<1>().data(0); // ptr to A[0]
-  const float* B_h = B.unchecked<1>().data(0); 
-  float* C_h = (float*)calloc(m * k, sizeof(float));
-
-  float* A_d, *B_d, *C_d;
-
-  CU_CHECK(cudaMalloc(&A_d, mem_sizeA));
-  CU_CHECK(cudaMalloc(&B_d, mem_sizeB));
-  CU_CHECK(cudaMalloc(&C_d, mem_sizeC));
-
-  cudaStream_t stream;
-  cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-
-  CU_CHECK(
-      cudaMemcpyAsync(A_d, A_h, mem_sizeA, cudaMemcpyHostToDevice, stream));
-  CU_CHECK(
-      cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream));
-
-  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  unsigned int gridCols = (k + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 gridSize(gridCols, gridRows); // blocks per grid
-  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-
-  MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
-      A_d, B_d, C_d, m, n, k);
-
-  // wait host thread & error check
-  CU_CHECK(cudaGetLastError());
-  CU_CHECK(cudaStreamSynchronize(stream));
-
-  // copy result back to host
-  CU_CHECK(
-      cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream));
-  CU_CHECK(cudaStreamSynchronize(stream));
-
-  cudaFree(A_d);
-  cudaFree(B_d);
-  cudaFree(C_d);
-  cudaStreamDestroy(stream);
-
-  // wrap the c ptr in a capsule with a destructor so we can safely pass it around
-  // we need to do this so when python destruct's its capsule obj we auto free the memory for the c ptr
-  py::capsule free_when_done(C_h, [](void *ptr) { free(ptr); });
-  py::array_t<float> result = py::array_t<float>(
-    {m, k}, // shape
-    C_h, // data ptr
-    free_when_done
-  );
-
-  return result;
-
-}
 
 void matMul() {
   // SET UP DATA
 
-  // m, n
-  // n, k
+  // m, n (A) && n, k (B)
   // dim3 dimsA(8, 5);
   // dim3 dimsB(5, 10);
   // dim3 dimsA(2048, 2048);
@@ -234,7 +160,7 @@ void matMul() {
   dim3 dimsB(8192, 32768);
   dim3 dimsC(dimsA.x, dimsB.y);
 
-  printf("[OPERATION] (%d, %d) * (%d, %d)\n", dimsA.x, dimsA.y, dimsA.y,
+  printf("[OPERATION] (%d, %d) * (%d, %d)\n", dimsA.x, dimsA.y, dimsB.x,
          dimsB.y);
 
   unsigned int size_A = dimsA.x * dimsA.y;
@@ -277,7 +203,7 @@ void matMul() {
 
   printf("[WARMING UP GPU]\n");
   // warm up runs 
-  SlowMatMulKernel<<<gridSize, blockSize, 1, stream>>>(
+  BasicMatMulKernel<<<gridSize, blockSize, 1, stream>>>(
       A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
   MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize, 1, stream>>>(
       A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
@@ -295,7 +221,7 @@ void matMul() {
   // <<<blocks in grid, block size (threads in block), dynamic shared mem,
   // gpu stream to run on>>>
   // NOTE: m = dimsA.x, n = dimsA.y, k = dimsB.y
-  SlowMatMulKernel<<<gridSize, blockSize, 1, stream>>>(
+  BasicMatMulKernel<<<gridSize, blockSize, 1, stream>>>(
       A_d, B_d, C_d, dimsA.x, dimsA.y, dimsB.y);
 
   CU_CHECK(cudaEventRecord(stop, stream));
@@ -329,6 +255,12 @@ void matMul() {
   CU_CHECK(
       cudaMemcpyAsync(C_h, C_d, mem_sizeC, cudaMemcpyDeviceToHost, stream));
   CU_CHECK(cudaStreamSynchronize(stream));
+  
+  // free device memory
+  cudaFree(A_d);
+  cudaFree(B_d);
+  cudaFree(C_d);
+  cudaStreamDestroy(stream);
 
   if (DEBUG) {
     printf("\n[MAT A] (%dx%d):\n", dimsA.x, dimsA.y);
@@ -339,29 +271,31 @@ void matMul() {
 
     printf("\n[MAT C = A * B] (%dx%d):\n", dimsC.x, dimsC.y);
     printMat(C_h, size_C, dimsC.y);
+
   }
+
 
   if (CPU) {
     float* C = (float*)calloc(size_C, sizeof(float));
 
+    printf("[RUNNING] CpuMatMul\n");
+
     auto s = std::chrono::high_resolution_clock::now();
     cpuMatMul(A_h, B_h, C, dimsA.x, dimsA.y, dimsB.y);
     auto e = std::chrono::high_resolution_clock::now();
+
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(e - s);
     printf("[TIME] CPU finished in %ldms.\n", duration.count());
+
     if (DEBUG) printMat(C, size_C, dimsC.y);
 
     free(C);
   }
 
-  // free memory
+  // free cpu memory
+  cudaFreeHost(C_h);
   cudaFreeHost(A_h);
   cudaFreeHost(B_h);
-  cudaFreeHost(C_h);
-  cudaFree(A_d);
-  cudaFree(B_d);
-  cudaFree(C_d);
-  cudaStreamDestroy(stream);
 }
 
 int main() {
@@ -384,14 +318,3 @@ int main() {
   return 0;
 }
 
-void init_matmul(py::module_ &m) {
-  m.def("matmul", &matMulNp,
-    "Matrix multiplication: A @ B = C\n"
-    "Args:\n"
-    "  A: 1D array, shape (m*n) representing (m, n) matrix in row-major order\n"
-    "  B: 1D array, shape (n*k) representing (n, k) matrix in row-major order\n"
-    "  m, n, k: matrix dimensions\n"
-    "Returns:\n"
-    "  C: 2D array, shape (m, k)"
-  );
-}

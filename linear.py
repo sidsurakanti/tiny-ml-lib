@@ -1,7 +1,7 @@
 import numpy as np
 from defs import Array
 from layer import Layer
-from native import matmul, toGPU, updateGpuMemory
+from native import matmul, toGPU, linear, initBuffers
 
 
 class Linear(Layer):
@@ -23,7 +23,7 @@ class Linear(Layer):
         self.b = np.zeros((1, self.output_shape))
 
         # forward pass
-        self.X = None
+        self.X = np.zeros((1, 1))
         # backward pass
         self.dW = np.zeros_like(self.W)
         self.db = np.zeros_like(self.b)
@@ -31,13 +31,28 @@ class Linear(Layer):
 
     def forward(self, X: Array) -> Array:
         self.X = X
-        m, n, k = self.X.shape[0], self.X.shape[1], self.W.shape[1]
+        if self._onGPU:
+            return self.gpuLinear()
+        return self.cpuLinear()
+
+    def gpuLinear(self):
+        m, n, k = self.batch_size, self.input_shape, self.output_shape
+
+        # send input to device if not already
+        if not isinstance(self.X, type(self.gpuPtrs[0][0])) and self.X is not None:
+            self.X = toGPU(self.X.reshape(-1), np.prod(self.X.shape))
 
         # X -> (m, inputs); W -> (inputs, outputs)
         # XW + b -> (m, outputs) => Z
-        # output = self.X @ self.W + self.b
-        output = matmul(self.X.reshape(-1), self.W.reshape(-1), m, n, k) + self.b
-        return output
+        linear(self.X, *self.gpuPtrs[0], m, n, k)
+
+        # output = matmul(self.X.reshape(-1), self.W.reshape(-1), m, n, k) + self.b
+
+        # print(self.gpuPtrs[0][2])
+        return self.gpuPtrs[0][2]  # ptr to C
+
+    def cpuLinear(self):
+        return self.X @ self.W + self.b
 
     def backwards(self, dZ: Array) -> Array:
         m, n = self.X.shape[0], self.X.shape[1]
@@ -77,7 +92,14 @@ class Linear(Layer):
         self.b = b
         return
 
-    def toGPU(self):
+    def toGPU(self, batch_size: int):
+        # init W, b, dW, dB, & Y on gpu memory
+        # having batch_size as an argument for now since we're gonna be calling it from the model class but might need to rework this for standalone usage
+        w, b, c, dw, db = initBuffers(
+            self.W.reshape(-1), self.input_shape, self.output_shape, batch_size
+        )
+        self.gpuPtrs = [(w, b, c), (dw, db)]
+        self.batch_size = batch_size
         self._onGPU = True
 
     def __repr__(self) -> str:

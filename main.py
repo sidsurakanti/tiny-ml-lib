@@ -36,7 +36,7 @@ plt.imshow(X_train[np.random.randint(m)].reshape((28, 28)))
 
 def main():
     fc = Linear(n, 10)  # (10, 784) * (784, m) -> (10, m)
-    a = ReLU()  # output-> (10, m)
+    a = ReLU(1024)  # output-> (10, m)
     fc2 = Linear(10, 10)
     conv2d = Conv2d((1, 28, 28), 5, 3)
 
@@ -51,11 +51,11 @@ def main():
 
     sequence = [
         Linear(784, 1024),
-        ReLU(),
+        ReLU(1024),
         Linear(1024, 1024),
-        ReLU(),
+        ReLU(1024),
         Linear(1024, 1024),
-        ReLU(),
+        ReLU(1024),
         Linear(1024, 10),
     ]
 
@@ -71,6 +71,7 @@ def main():
 
     model = Model(sequence, loss_fn)
     # model.load("mlp-weights.pkl")
+    model.toGPU()
 
     model(10, X_train, y_train, learning_rate=0.01, batch_size=512)
     # model(10, cX_train, y_train, batch_size=32)

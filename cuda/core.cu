@@ -20,6 +20,50 @@ py::capsule makeCapsule(void *ptr, bool isCudaPtr) {
 typedef typename py::array_t<float, py::array::c_style | py::array::forcecast>
     py_ndarray_t;
 
+void relu(py::capsule mat, int m, int n) {
+  float *ptr = static_cast<float *>(mat.get_pointer());
+
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridDim(gridCols, gridRows);      // blocks per grid
+  dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  ReluKernel<<<gridDim, blockDim>>>(ptr, m, n);
+}
+
+// we're gonna pass these capsules in from python and let them handle how they
+// use the capsules we've init'd
+// assume they're already on host and we just have to perform op
+void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule Y,
+            int inputs, int outputs, int batch_size) {
+  float *ptrX = static_cast<float *>(X.get_pointer()); // batchsize * inputs
+  float *ptrW = static_cast<float *>(W.get_pointer()); // inputs * outputs
+  float *ptrB = static_cast<float *>(b.get_pointer()); // 1 * outputs
+  float *ptrY = static_cast<float *>(Y.get_pointer()); // batchsize * outputs
+
+  int &m = batch_size;
+  int &n = inputs;
+  int &k = outputs;
+
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (k + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridDim(gridCols, gridRows);      // blocks per grid
+  dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  MatMulKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(ptrX, ptrW, ptrY, m, n, k);
+
+  // wait host thread & error check
+  CU_CHECK(cudaGetLastError());      // launch errors
+  CU_CHECK(cudaDeviceSynchronize()); // kernel errors
+
+  // output matrix is of size (batchsize, outputs) so we need a kernel size of
+  // that
+  unsigned int &vGridRows = gridRows;
+  unsigned int vGridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 vGridDim(vGridCols, vGridRows);
+  VecMatAddKernel<<<vGridDim, blockDim>>>(ptrB, ptrY, m, n);
+}
+
 py::array matMul(py_ndarray_t A, py_ndarray_t B, int m, int n, int k) {
   unsigned int size_A = m * n;
   unsigned int size_B = n * k;
@@ -82,14 +126,37 @@ py::array matMul(py_ndarray_t A, py_ndarray_t B, int m, int n, int k) {
   return result;
 }
 
-py::capsule toGPU(py_ndarray_t obj, int size) {
-  int memsize = size * sizeof(float);
+py::capsule initBuff(int m, int n) {
+  int memsize = (m * n) * sizeof(float);
   float *ptr;
 
   CU_CHECK(cudaMalloc(&ptr, memsize));
   CU_CHECK(cudaMemset(ptr, 0, memsize));
 
   return makeCapsule(ptr, true);
+}
+
+py::capsule toGPU(py_ndarray_t obj, int size) {
+  const float *dataPtr = obj.unchecked<1>().data(0); // ptr to weights
+  int memsize = size * sizeof(float);
+  float *ptr;
+
+  CU_CHECK(cudaMalloc(&ptr, memsize));
+  CU_CHECK(cudaMemcpy(ptr, dataPtr, memsize, cudaMemcpyHostToDevice));
+
+  return makeCapsule(ptr, true);
+}
+
+py::array toCPU(py::capsule cap, int m, int n) {
+  float *ptr = static_cast<float *>(cap.get_pointer());
+  int memsize = m * n * sizeof(float);
+  float *retPtr = (float *)malloc(memsize);
+
+  CU_CHECK(cudaMemcpy(retPtr, ptr, memsize, cudaMemcpyDeviceToHost));
+  py::array_t<float> result = py::array_t<float>({m, n}, // shape
+                                                 retPtr, // data ptr
+                                                 makeCapsule(retPtr, false));
+  return result;
 }
 
 void updateGpuMemory(py::capsule cap, int size) {
@@ -121,13 +188,14 @@ auto initBuffers(py_ndarray_t W, int input_size, int output_size,
   CU_CHECK(cudaMalloc(&ptrdW, memsizeW));
   CU_CHECK(cudaMalloc(&ptrdB, memsizeB));
 
-  CU_CHECK(cudaMemset(ptrB, 0, memsizeC));
-  CU_CHECK(cudaMemset(ptrC, 0, memsizeC));
-  CU_CHECK(cudaMemset(ptrW, 0, memsizeW));
-  CU_CHECK(cudaMemset(ptrB, 0, memsizeB));
-
   // copy over weight inits
   CU_CHECK(cudaMemcpy(ptrW, W_h, memsizeW, cudaMemcpyHostToDevice));
+
+  // set all new init'd mat's to 0
+  CU_CHECK(cudaMemset(ptrdW, 0, memsizeW));
+  CU_CHECK(cudaMemset(ptrB, 0, memsizeB));
+  CU_CHECK(cudaMemset(ptrdB, 0, memsizeB));
+  CU_CHECK(cudaMemset(ptrC, 0, memsizeC));
 
   py::capsule w = makeCapsule(ptrW, true);
   py::capsule b = makeCapsule(ptrB, true);
@@ -141,8 +209,12 @@ auto initBuffers(py_ndarray_t W, int input_size, int output_size,
 
 void init_matmul(py::module_ &m) {
   m.def("toGPU", &toGPU);
+  m.def("toCPU", &toCPU);
   m.def("updateGpuMemory", &updateGpuMemory);
+  m.def("initBuff", &initBuff);
   m.def("initBuffers", &initBuffers);
+  m.def("linear", &linear);
+  m.def("relu", &relu);
   m.def("matmul", &matMul,
         "Matrix multiplication: A @ B = C\n"
         "Args:\n"

@@ -46,7 +46,18 @@ void cpuMatMul(float *A, float *B, float *C, int m, int n, int k) {
   }
 }
 
-__global__ void vecMatAddKernel(float *vec, float *mat, int m, int n) {
+__global__ void ReluKernel(float *mat, int m, int n) {
+  int row = threadIdx.y + (blockIdx.y * blockDim.y);
+  int col = threadIdx.x + (blockIdx.x * blockDim.x);
+
+  if (row >= m || col >= n)
+    return;
+
+  float &value = mat[row * n + col];
+  value = value > 0 ? value : 0;
+}
+
+__global__ void VecMatAddKernel(float *vec, float *mat, int m, int n) {
   int row = threadIdx.y + (blockIdx.y * blockDim.y);
   int col = threadIdx.x + (blockIdx.x * blockDim.x);
 
@@ -66,7 +77,7 @@ void vecMatAdd(float *vec, float *mat, int m, int n, int k) {
   dim3 gridDim((m + blockDim.x - 1) / blockDim.x,
                (n + blockDim.y) / blockDim.y);
 
-  vecMatAddKernel<<<gridDim, blockDim>>>(vec, mat, m, n);
+  VecMatAddKernel<<<gridDim, blockDim>>>(vec, mat, m, n);
 }
 
 __global__ void BasicMatMulKernel(float *A, float *B, float *C, int m, int n,

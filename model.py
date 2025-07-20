@@ -4,6 +4,7 @@ import numpy as np
 from math import ceil
 from datetime import datetime
 import pickle
+from native import toCPU
 
 
 class Model:
@@ -16,14 +17,20 @@ class Model:
         self._onGPU = True
         for layer in self.sequence:
             if hasattr(layer, "toGPU"):
-                layer.toGPU()
+                layer.toGPU(512)
         return
 
     def forward(self, X: Array, y: Array):
         out = X
         for layer in self.sequence:
             out = layer.forward(out)
+        # send last output to cpu for loss calc
+        if self._onGPU:
+            out = toCPU(
+                out, self.sequence[-1].batch_size, self.sequence[-1].output_shape
+            )
         loss = self.loss(out, y)
+        # send it back to gpu for backprop (will do this once i get backprop on gpu
         return (out, loss)
 
     def backwards(self):

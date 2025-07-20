@@ -56,8 +56,6 @@ def main():
         ReLU(),
         Linear(1024, 1024),
         ReLU(),
-        Linear(1024, 1024),
-        ReLU(),
         Linear(1024, 10),
     ]
 

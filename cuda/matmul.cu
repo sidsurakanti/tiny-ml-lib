@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cuda_runtime.h>
 #include <iostream>
+#include <stdexcept>
 
 // ** lowk this file has a lot of dumb comments but that's js me thinking
 // ** feel free to ignore it it's a whole yap city down there
@@ -43,6 +44,29 @@ void cpuMatMul(float *A, float *B, float *C, int m, int n, int k) {
       }
     }
   }
+}
+
+__global__ void vecMatAddKernel(float *vec, float *mat, int m, int n) {
+  int row = threadIdx.y + (blockIdx.y * blockDim.y);
+  int col = threadIdx.x + (blockIdx.x * blockDim.x);
+
+  if (row >= m || col >= n)
+    return;
+
+  mat[row * n + col] += vec[col];
+}
+
+// make sure vec and mat are 1d row majored otherwise you're cooked bro
+void vecMatAdd(float *vec, float *mat, int m, int n, int k) {
+  if (k != m)
+    throw std::runtime_error("Dims mismatch, rows of vec and matrix have to be "
+                             "equal (you're ngmi if you keep doing ts bruv "
+                             "come back with proper inputs)");
+  dim3 blockDim(32, 32);
+  dim3 gridDim((m + blockDim.x - 1) / blockDim.x,
+               (n + blockDim.y) / blockDim.y);
+
+  vecMatAddKernel<<<gridDim, blockDim>>>(vec, mat, m, n);
 }
 
 __global__ void BasicMatMulKernel(float *A, float *B, float *C, int m, int n,

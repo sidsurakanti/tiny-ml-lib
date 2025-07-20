@@ -1,7 +1,7 @@
 import numpy as np
 from defs import Array
 from layer import Layer
-from native import matmul
+from native import matmul, toGPU, updateGpuMemory
 
 
 class Linear(Layer):
@@ -19,13 +19,15 @@ class Linear(Layer):
 
         # init weights and biases
         self.W = np.random.randn(self.input_shape, self.output_shape) * INITS[init]
-        self.b = np.random.randn(1, self.output_shape)
+        # self.b = np.random.randn(1, self.output_shape)
+        self.b = np.zeros((1, self.output_shape))
 
         # forward pass
         self.X = None
         # backward pass
         self.dW = np.zeros_like(self.W)
         self.db = np.zeros_like(self.b)
+        self._onGPU = False
 
     def forward(self, X: Array) -> Array:
         self.X = X
@@ -74,6 +76,9 @@ class Linear(Layer):
         self.W = W
         self.b = b
         return
+
+    def toGPU(self):
+        self._onGPU = True
 
     def __repr__(self) -> str:
         return f"<Linear: {self.input_shape} -> {self.output_shape}>"

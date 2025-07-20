@@ -10,6 +10,14 @@ class Model:
     def __init__(self, sequence: Sequence, loss_fn) -> None:
         self.sequence = sequence
         self.loss = loss_fn
+        self._onGPU = False
+
+    def toGPU(self):
+        self._onGPU = True
+        for layer in self.sequence:
+            if hasattr(layer, "toGPU"):
+                layer.toGPU()
+        return
 
     def forward(self, X: Array, y: Array):
         out = X

@@ -1,5 +1,4 @@
 #pragma once
-#include <stdio.h>
 
 #define CU_CHECK(call)                                                         \
   do {                                                                         \

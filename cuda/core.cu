@@ -9,6 +9,8 @@
 namespace py = pybind11;
 
 const int BLOCK_SIZE = 16;
+typedef typename py::array_t<float, py::array::c_style | py::array::forcecast>
+    py_ndarray_t;
 
 py::capsule makeCapsule(void *ptr, bool isCudaPtr) {
   auto deleter =
@@ -17,29 +19,63 @@ py::capsule makeCapsule(void *ptr, bool isCudaPtr) {
   return py::capsule(ptr, deleter);
 }
 
-typedef typename py::array_t<float, py::array::c_style | py::array::forcecast>
-    py_ndarray_t;
-
-void relu(py::capsule mat, int m, int n) {
-  float *ptr = static_cast<float *>(mat.get_pointer());
+float *matTranspose(float *mat, int m, int n) {
+  // create output buff
+  float *buf;
+  CU_CHECK(cudaMalloc(&buf, m * n * sizeof(float)));
 
   unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
   unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
   dim3 gridDim(gridCols, gridRows);      // blocks per grid
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+  MatTransposeKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(mat, buf, m, n);
 
-  ReluKernel<<<gridDim, blockDim>>>(ptr, m, n);
+  CU_CHECK(cudaGetLastError());
+  return buf;
+}
+
+void matMul(float *A, float *B, float *C, int m, int n, int k) {
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (k + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridSize(gridCols, gridRows);      // blocks per grid
+  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize>>>(A, B, C, m, n, k);
+  CU_CHECK(cudaGetLastError());
+}
+
+void matSum(float *mat, float *dst, int m, int n) {
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridSize(gridCols, gridRows);      // blocks per grid
+  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  MatSumKernel<<<gridSize, blockSize>>>(mat, dst, m, n);
+  CU_CHECK(cudaGetLastError());
+}
+
+void matMatSub(py::capsule mat, py::capsule subber, float c, int m, int n) {
+  float *ptrMat = static_cast<float *>(mat.get_pointer()); // batchsize * inputs
+  float *ptrSubber =
+      static_cast<float *>(subber.get_pointer()); // inputs * outputs
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridSize(gridCols, gridRows);      // blocks per grid
+  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  MatMatSubKernel<<<gridSize, blockSize>>>(ptrMat, ptrSubber, c, m, n);
+  CU_CHECK(cudaGetLastError());
 }
 
 // we're gonna pass these capsules in from python and let them handle how they
 // use the capsules we've init'd
 // assume they're already on host and we just have to perform op
-void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule Y,
-            int inputs, int outputs, int batch_size) {
+void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule C,
+            int batch_size, int inputs, int outputs) {
   float *ptrX = static_cast<float *>(X.get_pointer()); // batchsize * inputs
   float *ptrW = static_cast<float *>(W.get_pointer()); // inputs * outputs
   float *ptrB = static_cast<float *>(b.get_pointer()); // 1 * outputs
-  float *ptrY = static_cast<float *>(Y.get_pointer()); // batchsize * outputs
+  float *ptrC = static_cast<float *>(C.get_pointer()); // batchsize * outputs
 
   int &m = batch_size;
   int &n = inputs;
@@ -50,21 +86,80 @@ void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule Y,
   dim3 gridDim(gridCols, gridRows);      // blocks per grid
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
-  MatMulKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(ptrX, ptrW, ptrY, m, n, k);
+  MatMulKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(ptrX, ptrW, ptrC, m, n, k);
 
   // wait host thread & error check
   CU_CHECK(cudaGetLastError());      // launch errors
   CU_CHECK(cudaDeviceSynchronize()); // kernel errors
 
-  // output matrix is of size (batchsize, outputs) so we need a kernel size of
-  // that
-  unsigned int &vGridRows = gridRows;
-  unsigned int vGridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 vGridDim(vGridCols, vGridRows);
-  VecMatAddKernel<<<vGridDim, blockDim>>>(ptrB, ptrY, m, n);
+  vecMatAdd(ptrB, ptrC, m, k);
 }
 
-py::array matMul(py_ndarray_t A, py_ndarray_t B, int m, int n, int k) {
+// write result (dX) to input from L-1 (self.X)
+auto linearBack(py::capsule X, py::capsule W, py::capsule dW, py::capsule dB,
+                py::capsule dZ, int batch_size, int inputs, int outputs) {
+  float *ptrX =
+      static_cast<float *>(X.get_pointer()); // batchsize * inputs (m, n)
+  float *ptrW =
+      static_cast<float *>(W.get_pointer()); // inputs * outputs (n, k)
+  float *ptrdW = static_cast<float *>(dW.get_pointer()); // inputs * outputs
+  float *ptrdB = static_cast<float *>(dB.get_pointer()); // 1 * outputs (1, k)
+  float *ptrdZ =
+      static_cast<float *>(dZ.get_pointer()); // batchsize * outputs (m, k)
+
+  int &m = batch_size;
+  int &n = inputs;
+  int &k = outputs;
+
+  // calculate dW
+  // (m, n).T * (m, k) = (n, k)
+  // x.T @ dZ / m = dW
+  float *xT = matTranspose(ptrX, m, n);
+  matMul(xT, ptrdZ, ptrdW, n, m, k);
+  vecMatDiv(m, ptrdW, n, k);
+  cudaFree(xT);
+
+  // calc dB
+  // sum(dZ) / m
+  // sum(m, k) = (1, k)
+  matSum(ptrdZ, ptrdB, m, k);
+  vecMatDiv(m, ptrdB, 1, k);
+
+  // calc dX (override ptrX bc dZ is just gonna be the layers output buff)
+  // (m, k) * (n, k).T = (m, n)
+  // dZ @ w.T
+  float *wT = matTranspose(ptrW, n, k);
+  matMul(ptrdZ, wT, ptrX, m, k, n);
+  cudaFree(wT);
+}
+
+void relu(py::capsule X, py::capsule C, int m, int n) {
+  float *ptrX = static_cast<float *>(X.get_pointer());
+  float *ptrC = static_cast<float *>(C.get_pointer());
+
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridDim(gridCols, gridRows);      // blocks per grid
+  dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  ReluKernel<<<gridDim, blockDim>>>(ptrX, ptrC, m, n);
+}
+
+void reluBack(py::capsule dZ, py::capsule X, int m, int n) {
+  float *ptrX =
+      static_cast<float *>(X.get_pointer()); // batchsize * inputs (m, n)
+  float *ptrdZ =
+      static_cast<float *>(dZ.get_pointer()); // batchsize * outputs (m, k)
+
+  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  dim3 gridDim(gridCols, gridRows);      // blocks per grid
+  dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
+
+  ReluBackKernel<<<gridDim, blockDim>>>(ptrdZ, ptrX, m, n);
+}
+
+py::array npMatMul(py_ndarray_t A, py_ndarray_t B, int m, int n, int k) {
   unsigned int size_A = m * n;
   unsigned int size_B = n * k;
   unsigned int size_C = m * k;
@@ -159,12 +254,12 @@ py::array toCPU(py::capsule cap, int m, int n) {
   return result;
 }
 
-void updateGpuMemory(py::capsule cap, int size) {
-  float *ptrH = static_cast<float *>(cap.get_pointer());
-  float *ptrD;
+void updateGpuMemory(py_ndarray_t arr, py::capsule gpuPtr, int m, int n) {
+  float *ptrD = static_cast<float *>(gpuPtr.get_pointer());
+  const float *ptrH = arr.unchecked<1>().data(0);
 
   CU_CHECK(
-      cudaMemcpy(ptrD, ptrH, size * sizeof(float), cudaMemcpyHostToDevice));
+      cudaMemcpy(ptrD, ptrH, m * n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
 auto initBuffers(py_ndarray_t W, int input_size, int output_size,
@@ -214,8 +309,11 @@ void init_matmul(py::module_ &m) {
   m.def("initBuff", &initBuff);
   m.def("initBuffers", &initBuffers);
   m.def("linear", &linear);
+  m.def("linearBack", &linearBack);
+  m.def("matMatSub", &matMatSub);
   m.def("relu", &relu);
-  m.def("matmul", &matMul,
+  m.def("reluBack", &reluBack);
+  m.def("matmul", &npMatMul,
         "Matrix multiplication: A @ B = C\n"
         "Args:\n"
         "  A: 1D array, shape (m*n) representing (m, n) matrix in row-major "

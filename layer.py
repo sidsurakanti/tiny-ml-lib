@@ -9,5 +9,6 @@ class Layer(ABC):
         pass
 
     @abstractmethod
-    def backwards(self, *args, **kwargs) -> NDArray[np.float64]:
+    #
+    def backwards(self, *args, **kwargs) -> None | NDArray[np.float64]:
         pass

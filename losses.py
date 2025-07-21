@@ -1,5 +1,6 @@
 import numpy as np
 from defs import Array
+from native import updateGpuMemory
 
 
 def one_hot(classes: int, truth: Array):
@@ -38,7 +39,10 @@ class MSELoss:
         dZ = 2 * (self.probs - self.targets)
         return dZ
 
-    def __call__(self, *args, **kwds):
+    def toGPU(self):
+        self._onGPU = True
+
+    def __call__(self, *args):
         return self.loss(*args)
 
     def __repr__(self) -> str:
@@ -50,10 +54,13 @@ class CrossEntropyLoss:
         self.probs = None
         self.targets = None
 
-    def loss(self, logits, truth):
+    def loss(self, logits, truth, logitsPtr=None):
         _, n = logits.shape  # m, n
         probs = softmax(logits)
         targets = one_hot(n, truth)
+
+        if self._onGPU and logitsPtr:
+            self.logitsPtr = logitsPtr
 
         # cache it for backprop
         self.probs = probs
@@ -65,10 +72,16 @@ class CrossEntropyLoss:
         # basically, take ln(prediction) for singular correct class b/c y is != 0
         return -np.mean(np.sum(targets * np.log(probs + 1e-9))) / n
 
-    def backwards(self) -> Array:
+    def backwards(self) -> Array | None:
         # (y_i - t_i)
         dZ = self.probs - self.targets
+        if self._onGPU:
+            updateGpuMemory(dZ.reshape(-1), self.logitsPtr, *dZ.shape)
+            return
         return dZ
+
+    def toGPU(self):
+        self._onGPU = True
 
     def __call__(self, *args):
         return self.loss(*args)

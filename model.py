@@ -18,19 +18,24 @@ class Model:
         for layer in self.sequence:
             if hasattr(layer, "toGPU"):
                 layer.toGPU(512)
+        self.loss.toGPU()
         return
 
-    def forward(self, X: Array, y: Array):
+    def forward(self, X: Array, y: Array, batch_size: int):
         out = X
         for layer in self.sequence:
+            if batch_size != layer.batch_size:
+                layer.batch_size = batch_size
             out = layer.forward(out)
         # send last output to cpu for loss calc
         if self._onGPU:
-            out = toCPU(
+            outH = toCPU(
                 out, self.sequence[-1].batch_size, self.sequence[-1].output_shape
             )
+            loss = self.loss(outH, y, out)
+            return (out, loss)
+
         loss = self.loss(out, y)
-        # send it back to gpu for backprop (will do this once i get backprop on gpu
         return (out, loss)
 
     def backwards(self):
@@ -38,7 +43,6 @@ class Model:
         for layer in reversed(self.sequence):
             # print(layer.__repr__(), dZ.shape)
             dZ = layer.backwards(dZ)
-        return dZ
 
     def step(self, learning_rate: float):
         for layer in self.sequence:
@@ -52,7 +56,8 @@ class Model:
         total_batches = len(batches)
 
         for i, (x, y) in enumerate(batches, start=1):
-            _, loss = self.forward(x, y)
+            curr_batch_size = y.shape[0]  # deal with uneven batches at the end
+            _, loss = self.forward(x, y, curr_batch_size)
             self.backwards()
             if i % ceil(total_batches / 4) == 0 or i == total_batches:
                 print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}", end="\r")
@@ -79,7 +84,7 @@ class Model:
         indices = np.random.permutation(len(X_test))
         X_test, y_test = X_test[indices], y_test[indices]
 
-        out, _ = self.forward(X_test, y_test)
+        out, _ = self.forward(X_test, y_test, y_test.shape[0])
         preds = np.argmax(out, axis=1)
         correct = np.sum(preds == y_test)
         r = np.random.randint(0, preds.shape[0])

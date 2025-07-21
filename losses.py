@@ -55,7 +55,7 @@ class CrossEntropyLoss:
         self.targets = None
 
     def loss(self, logits, truth, logitsPtr=None):
-        _, n = logits.shape  # m, n
+        m, n = logits.shape  # m, n
         probs = softmax(logits)
         targets = one_hot(n, truth)
 
@@ -70,7 +70,7 @@ class CrossEntropyLoss:
 
         # sum(y * ln(p)) for p_i in logits
         # basically, take ln(prediction) for singular correct class b/c y is != 0
-        return -np.mean(np.sum(targets * np.log(probs + 1e-9))) / n
+        return -np.sum(targets * np.log(probs + 1e-9)) / m
 
     def backwards(self) -> Array | None:
         # (y_i - t_i)

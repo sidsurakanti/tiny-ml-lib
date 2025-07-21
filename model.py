@@ -82,9 +82,14 @@ class Model:
     def evaluate(self, X_test: Array, y_test: Array):
         print("\nEVALUATING...")
         indices = np.random.permutation(len(X_test))
-        X_test, y_test = X_test[indices], y_test[indices]
+        X_test, y_test = X_test[indices][:512], y_test[indices][:512]
 
         out, _ = self.forward(X_test, y_test, y_test.shape[0])
+        if self._onGPU:
+            batch_size = y_test.shape[0]
+            outputs = self.sequence[-1].output_shape
+            out = toCPU(out, batch_size, outputs)
+
         preds = np.argmax(out, axis=1)
         correct = np.sum(preds == y_test)
         r = np.random.randint(0, preds.shape[0])

@@ -29,7 +29,7 @@ float *matTranspose(float *mat, int m, int n) {
   dim3 gridDim(gridCols, gridRows);      // blocks per grid
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
   MatTransposeKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(mat, buf, m, n);
-
+  CU_CHECK(cudaDeviceSynchronize());
   CU_CHECK(cudaGetLastError());
   return buf;
 }
@@ -51,6 +51,7 @@ void matSum(float *mat, float *dst, int m, int n) {
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   MatSumKernel<<<gridSize, blockSize>>>(mat, dst, m, n);
+  CU_CHECK(cudaDeviceSynchronize());
   CU_CHECK(cudaGetLastError());
 }
 
@@ -64,6 +65,7 @@ void matMatSub(py::capsule mat, py::capsule subber, float c, int m, int n) {
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   MatMatSubKernel<<<gridSize, blockSize>>>(ptrMat, ptrSubber, c, m, n);
+  CU_CHECK(cudaDeviceSynchronize());
   CU_CHECK(cudaGetLastError());
 }
 
@@ -96,7 +98,7 @@ void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule C,
 }
 
 // write result (dX) to input from L-1 (self.X)
-auto linearBack(py::capsule X, py::capsule W, py::capsule dW, py::capsule dB,
+void linearBack(py::capsule X, py::capsule W, py::capsule dW, py::capsule dB,
                 py::capsule dZ, int batch_size, int inputs, int outputs) {
   float *ptrX =
       static_cast<float *>(X.get_pointer()); // batchsize * inputs (m, n)
@@ -122,6 +124,8 @@ auto linearBack(py::capsule X, py::capsule W, py::capsule dW, py::capsule dB,
   // calc dB
   // sum(dZ) / m
   // sum(m, k) = (1, k)
+  // zero out prev dB
+  cudaMemset(ptrdB, 0, sizeof(float) * outputs);
   matSum(ptrdZ, ptrdB, m, k);
   vecMatDiv(m, ptrdB, 1, k);
 
@@ -143,6 +147,7 @@ void relu(py::capsule X, py::capsule C, int m, int n) {
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   ReluKernel<<<gridDim, blockDim>>>(ptrX, ptrC, m, n);
+  CU_CHECK(cudaGetLastError());
 }
 
 void reluBack(py::capsule dZ, py::capsule X, int m, int n) {
@@ -157,6 +162,7 @@ void reluBack(py::capsule dZ, py::capsule X, int m, int n) {
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   ReluBackKernel<<<gridDim, blockDim>>>(ptrdZ, ptrX, m, n);
+  CU_CHECK(cudaGetLastError());
 }
 
 py::array npMatMul(py_ndarray_t A, py_ndarray_t B, int m, int n, int k) {

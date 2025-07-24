@@ -41,21 +41,20 @@ void matMul(float *A, float *B, float *C, int m, int n, int k) {
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize>>>(A, B, C, m, n, k);
-  CU_CHECK(cudaDeviceSynchronize());
   CU_CHECK(cudaGetLastError());
 }
 
+// equiv to np.sum(mat, axis=0)
 void matSum(float *mat, float *dst, int m, int n) {
   unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
   unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
   dim3 gridSize(gridCols, gridRows);      // blocks per grid
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-
   MatSumKernel<<<gridSize, blockSize>>>(mat, dst, m, n);
-  CU_CHECK(cudaDeviceSynchronize());
   CU_CHECK(cudaGetLastError());
 }
 
+// mat A - B
 void matMatSub(py::capsule mat, py::capsule subber, float c, int m, int n) {
   float *ptrMat = static_cast<float *>(mat.get_pointer()); // batchsize * inputs
   float *ptrSubber =
@@ -67,7 +66,6 @@ void matMatSub(py::capsule mat, py::capsule subber, float c, int m, int n) {
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   MatMatSubKernel<<<gridSize, blockSize>>>(ptrMat, ptrSubber, c, m, n);
-  CU_CHECK(cudaDeviceSynchronize());
   CU_CHECK(cudaGetLastError());
 }
 
@@ -92,9 +90,9 @@ void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule C,
 
   MatMulKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(ptrX, ptrW, ptrC, m, n, k);
 
-  // wait host thread & error check
-  CU_CHECK(cudaGetLastError());      // launch errors
-  CU_CHECK(cudaDeviceSynchronize()); // kernel errors
+  // dont have to cuda dev sync here because everything in the same thread runs
+  // sequentially
+  CU_CHECK(cudaGetLastError()); // launch errors
 
   vecMatAdd(ptrB, ptrC, m, k);
 }
@@ -106,7 +104,8 @@ void linearBack(py::capsule X, py::capsule W, py::capsule dW, py::capsule dB,
       static_cast<float *>(X.get_pointer()); // batchsize * inputs (m, n)
   float *ptrW =
       static_cast<float *>(W.get_pointer()); // inputs * outputs (n, k)
-  float *ptrdW = static_cast<float *>(dW.get_pointer()); // inputs * outputs
+  float *ptrdW =
+      static_cast<float *>(dW.get_pointer()); // inputs * outputs (n, k)
   float *ptrdB = static_cast<float *>(dB.get_pointer()); // 1 * outputs (1, k)
   float *ptrdZ =
       static_cast<float *>(dZ.get_pointer()); // batchsize * outputs (m, k)
@@ -116,6 +115,7 @@ void linearBack(py::capsule X, py::capsule W, py::capsule dW, py::capsule dB,
   int &k = outputs;
 
   // zero grads before refilling
+  // not needed b/c we reassign values but im just putting this here
   cudaMemset(ptrdW, 0, n * k * sizeof(float));
   cudaMemset(ptrdB, 0, k * sizeof(float));
 
@@ -167,6 +167,7 @@ void reluBack(py::capsule dZ, py::capsule X, int m, int n) {
   dim3 gridDim(gridCols, gridRows);      // blocks per grid
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
+  // write res to ptrX
   ReluBackKernel<<<gridDim, blockDim>>>(ptrdZ, ptrX, m, n);
   CU_CHECK(cudaGetLastError());
 }

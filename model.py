@@ -4,6 +4,7 @@ import numpy as np
 from math import ceil
 from datetime import datetime
 import pickle
+from layer import ParamLayer, Layer
 from native import toCPU
 
 
@@ -13,23 +14,19 @@ class Model:
         self.loss = loss_fn
         self._onGPU = False
 
-    def toGPU(self):
+    def toGPU(self, batch_size: int):
         self._onGPU = True
-        for layer in self.sequence:
-            if hasattr(layer, "toGPU"):
-                layer.toGPU(512)
         self.loss.toGPU()
-        return
+        for layer in self.sequence:
+            if isinstance(layer, Layer):
+                layer.toGPU(batch_size)
 
     def forward(self, X: Array, y: Array, batch_size: int):
         out = X
         for layer in self.sequence:
-            if batch_size != layer.batch_size:
+            if self._onGPU and batch_size != layer.batch_size:
                 layer.batch_size = batch_size
             out = layer.forward(out)
-
-            if hasattr(layer, "gpuPtrs"):
-                pass
 
         # send last layer's output to cpu for loss calc
         if self._onGPU:
@@ -45,41 +42,38 @@ class Model:
     def backwards(self):
         dZ = self.loss.backwards()
         for layer in reversed(self.sequence):
-            # print(layer.__repr__(), dZ.shape)
             dZ = layer.backwards(dZ)
 
     def step(self, learning_rate: float):
         for layer in self.sequence:
-            if hasattr(layer, "step"):
+            if isinstance(layer, ParamLayer):
                 layer.step(learning_rate=learning_rate)
 
     def train(
         self, X: Array, y: Array, learning_rate: float = 0.01, batch_size: int = 0
-    ):
+    ) -> int:
         batches = Batcher((X, y), batch_size)
         total_batches = len(batches)
+        loss = 8888
 
         for i, (x, y) in enumerate(batches, start=1):
-            curr_batch_size = y.shape[0]  # deal with uneven batches at the end
-            _, loss = self.forward(x, y, curr_batch_size)
+            batch_size = y.shape[0]  # deal with uneven batches at the end
+            _, loss = self.forward(x, y, batch_size)
             self.backwards()
+            self.step(learning_rate)
             if i % ceil(total_batches / 4) == 0 or i == total_batches:
                 print(f"Batch {i}/{total_batches}, Loss: {loss:.4f}", end="\r")
-
-            self.step(learning_rate)
         return loss
 
     def fit(self, epochs: int = 5, *args, **kwargs):
         print(self)
-
         print("\nTRAINING...")
+
         start_time = datetime.now()
-        for epoch in range(epochs):
+        for e in range(epochs):
             loss = self.train(*args, **kwargs)
-            print(f"EPOCH {epoch + 1}/{epochs}, Loss: {loss:.4f}")
-        print(
-            f"Time spent training: {(datetime.now() - start_time).total_seconds():.2f}s"
-        )
+            print(f"EPOCH {e + 1}/{epochs}, Loss: {loss:.4f}")
+        print(f"Finished in: {(datetime.now() - start_time).total_seconds():.2f}s")
 
         return
 
@@ -104,19 +98,16 @@ class Model:
         total = y_test.shape[0]
         return correct / total
 
-    def predict(self, *args, **kwargs):
-        raise NotImplementedError("Model predict method not implemented.")
-
     @property
     def state_dict(self):
         state = {
             "weights": [
-                l.get_weights() for l in self.sequence if hasattr(l, "get_weights")
+                l.get_weights() for l in self.sequence if isinstance(l, ParamLayer)
             ],
             "arch": [
                 (type(l).__name__, l.input_shape, l.output_shape)
                 for l in self.sequence
-                if hasattr(l, "input_shape")
+                if isinstance(l, ParamLayer)
             ],
         }
 
@@ -125,19 +116,22 @@ class Model:
     def save(self, path: str = "model_weights.pkl"):
         with open(path, "wb") as f:
             pickle.dump(self.state_dict, f)
-        return print("Saved model weights to", path)
+        print("Saved model weights to", path)
 
     def load(self, path: str):
         with open(path, "rb") as f:
             state_dict = pickle.load(f)
 
         assert state_dict["arch"] == self.state_dict["arch"], "Model type mismatch."
-        layers = [l for l in self.sequence if hasattr(l, "set_weights")]
+        layers = [l for l in self.sequence if isinstance(l, ParamLayer)]
 
         for layer, weights in zip(layers, state_dict["weights"]):
             layer.set_weights(*weights)
 
-        return print("Loaded model weights from", path)
+        print("Loaded model weights from", path)
+
+    def __call__(self, *args, **kwargs):
+        return self.fit(*args, **kwargs)
 
     def __repr__(self):
         lines = ["Model("]
@@ -145,35 +139,18 @@ class Model:
 
         for i, layer in enumerate(self.sequence):
             name = type(layer).__name__
-            has_shapes = hasattr(layer, "input_shape") and hasattr(
-                layer, "output_shape"
-            )
 
-            if has_shapes:
-                in_shape = layer.input_shape
-                out_shape = layer.output_shape
-                shape_str = f" ({in_shape} → {out_shape})"
+            if isinstance(layer, ParamLayer):
+                weights = layer.get_weights()
+                total_params += sum(np.prod(w.shape) for w in weights)
+                shape_str = f" ({layer.input_shape} → {layer.output_shape})"
             else:
                 shape_str = ""
 
             lines.append(f"  [{i}] {name:<12}{shape_str}")
 
-            if hasattr(layer, "get_weights"):
-                weights = layer.get_weights()
-                total_params += sum(np.prod(w.shape) for w in weights)
-
         lines.append(f"  Loss: {type(self.loss).__name__}")
         lines.append(f"  Total parameters: {total_params:,}")
+        lines.append(f"  Device: {"GPU" if self._onGPU else "CPU"}")
         lines.append(")")
         return "\n".join(lines)
-
-    def __call__(self, *args, **kwargs):
-        return self.fit(*args, **kwargs)
-
-
-if __name__ == "__main__":
-    pass
-    # m = Model(1, 1)
-    # print(dir(Model))
-    # print(id(m), type(m).__name__)
-    # m.save()

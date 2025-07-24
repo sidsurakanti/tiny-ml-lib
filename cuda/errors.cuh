@@ -4,7 +4,8 @@
   do {                                                                         \
     const cudaError_t error_code = call;                                       \
     if (error_code != cudaSuccess) {                                           \
-      printf("[CUDA ERROR] in %s:%d\n", __FILE__, __LINE__);                   \
+      printf("[CUDA ERROR] in %s\n", __FILE__);                                \
+      printf("[IN LINE] in %d\n", __LINE__);                                   \
       printf("[ERR CODE] %d\n", error_code);                                   \
       printf("[ERR] %s\n", cudaGetErrorString(error_code));                    \
       exit(1);                                                                 \

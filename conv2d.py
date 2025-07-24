@@ -1,11 +1,11 @@
 import numpy as np
 from scipy import signal
 from defs import Array
-from layer import Layer
+from layer import ParamLayer
 from typing import Tuple
 
 
-class Conv2d(Layer):
+class Conv2d(ParamLayer):
     def __init__(
         self,
         input_shape: Tuple[int, int, int],
@@ -106,6 +106,9 @@ class Conv2d(Layer):
         self.W = W
         self.b = b
         return
+
+    def toGPU(self):
+        assert False, "No GPU implementation for Convolutional Layer yet"
 
     def __repr__(self):
         return f"<Conv2D: {self.input_shape} -> {self.output_shape}, Filters: {self.filters}, {self.filter_size}x{self.filters}>"

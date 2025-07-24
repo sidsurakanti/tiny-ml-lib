@@ -9,6 +9,7 @@ class MaxPool(Layer):
         self._X = None
         self.mask = np.zeros((0, 0))
         self.arg_idxs = []
+        self.onGPU = False
 
     def forward(self, X: Array):
         self.X = X
@@ -53,6 +54,9 @@ class MaxPool(Layer):
     def X(self, val):
         self.mask = np.zeros_like(val)
         self._X = val
+
+    def toGPU(self):
+        assert False, "No GPU implementation for Convolutional Layer yet"
 
     def __repr__(self):
         return f"<MaxPool>"

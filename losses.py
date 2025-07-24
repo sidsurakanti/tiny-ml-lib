@@ -3,24 +3,25 @@ from defs import Array
 from native import updateGpuMemory
 
 
-def one_hot(classes: int, truth: Array):
+def one_hot(classes: int, truth: Array) -> Array:
     m = truth.shape[0]
-    arr = np.zeros((m, classes))
-    arr[np.arange(m), truth] = 1
-    return arr
+    res = np.zeros((m, classes))
+    res[np.arange(m), truth] = 1
+    return res
 
 
-def softmax(logits):
-    h = np.max(logits, axis=1, keepdims=1)
+def softmax(logits) -> Array:
+    h = np.max(logits, axis=1, keepdims=True)
     exp = np.exp(logits - h)
-    probs = exp / np.sum(exp, axis=1, keepdims=1)
+    probs = exp / np.sum(exp, axis=1, keepdims=True)
     return probs
 
 
 class MSELoss:
     def __init__(self):
-        self.probs = None
-        self.targets = None
+        self.probs = np.zeros((0, 0))
+        self.targets = np.zeros((0, 0))
+        self._onGPU = False
 
     def loss(self, logits, truth):
         probs = softmax(logits)
@@ -30,8 +31,6 @@ class MSELoss:
         self.probs = probs
         self.targets = targets
 
-        # sum(y * ln(p)) for p_i in logits
-        # basically, take ln(prediction) for singular correct class b/c y is != 0
         return -np.sum((probs - targets) ** 2)
 
     def backwards(self):
@@ -51,8 +50,9 @@ class MSELoss:
 
 class CrossEntropyLoss:
     def __init__(self):
-        self.probs = None
-        self.targets = None
+        self.probs = np.zeros((0, 0))
+        self.targets = np.zeros((0, 0))
+        self._onGPU = False
 
     def loss(self, logits, truth, logitsPtr=None):
         m, n = logits.shape  # m, n
@@ -62,11 +62,8 @@ class CrossEntropyLoss:
         if self._onGPU and logitsPtr:
             self.logitsPtr = logitsPtr
 
-        # cache it for backprop
         self.probs = probs
         self.targets = targets
-
-        # print(logits.shape, probs.shape, targets.shape)
 
         # sum(y * ln(p)) for p_i in logits
         # basically, take ln(prediction) for singular correct class b/c y is != 0
@@ -75,7 +72,7 @@ class CrossEntropyLoss:
     def backwards(self) -> Array | None:
         # (y_i - t_i)
         dZ = self.probs - self.targets
-        # store dZ in the logits buffer & let the backwards of the linear layer handle it
+        # store dZ in the logits buffer (output buff for layer L-1) & let the backwards of the linear layer handle it
         if self._onGPU:
             updateGpuMemory(dZ.reshape(-1), self.logitsPtr, *dZ.shape)
             return self.logitsPtr
@@ -89,13 +86,3 @@ class CrossEntropyLoss:
 
     def __repr__(self) -> str:
         return f"<CrossEntropyLoss>"
-
-
-if __name__ == "__main__":
-    truth = np.array([3, 5, 6, 9])
-    logits = np.random.rand(10, 4)
-    loss_fn = CrossEntropyLoss()
-
-    # print(softmax(logits))
-    # print(logits)
-    print(loss_fn(logits, truth))

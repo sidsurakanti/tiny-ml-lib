@@ -27,7 +27,11 @@ class Model:
             if batch_size != layer.batch_size:
                 layer.batch_size = batch_size
             out = layer.forward(out)
-        # send last output to cpu for loss calc
+
+            if hasattr(layer, "gpuPtrs"):
+                pass
+
+        # send last layer's output to cpu for loss calc
         if self._onGPU:
             outH = toCPU(
                 out, self.sequence[-1].batch_size, self.sequence[-1].output_shape

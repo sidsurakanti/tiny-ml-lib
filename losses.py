@@ -75,9 +75,10 @@ class CrossEntropyLoss:
     def backwards(self) -> Array | None:
         # (y_i - t_i)
         dZ = self.probs - self.targets
+        # store dZ in the logits buffer & let the backwards of the linear layer handle it
         if self._onGPU:
             updateGpuMemory(dZ.reshape(-1), self.logitsPtr, *dZ.shape)
-            return
+            return self.logitsPtr
         return dZ
 
     def toGPU(self):

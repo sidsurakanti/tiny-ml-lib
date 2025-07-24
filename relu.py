@@ -1,7 +1,7 @@
 import numpy as np
 from defs import Array
 from layer import Layer
-from native import initBuff, relu, reluBack
+from native import initBuff, relu, reluBack, toCPU
 
 
 class ReLU(Layer):
@@ -24,9 +24,11 @@ class ReLU(Layer):
         return self.out
 
     def backwards(self, dZ: Array) -> None | Array:
+        # print(dZ, self.ptrC)
         if self._onGPU:
             m, n = self.batch_size, self.output_shape
             reluBack(self.ptrC, self.X, m, n)
+            return self.X
         else:
             return dZ * (self.X > 0).astype(float)
 
@@ -35,6 +37,17 @@ class ReLU(Layer):
         # init output buff
         self.batch_size = batch_size
         self.ptrC = initBuff(self.batch_size, self.output_shape)
+
+    def debug(self):
+        print(self)
+        print("input", self.X)
+        print("out", self.ptrC)
+
+        out = toCPU(self.out, self.batch_size, self.output_shape)
+        input = toCPU(self.X, self.batch_size, self.output_shape)
+        print("input", input[0, :5])
+        print("output", out[0, :5])
+        print()
 
     def __repr__(self) -> str:
         return f"<ReLU>"

@@ -80,7 +80,7 @@ __global__ void MatMatSubKernel(float *mat, float *subber, float c, int m,
   int col = threadIdx.x + (blockIdx.x * blockDim.x);
 
   if (row < m && col < n)
-    mat[row * n + col] -= (c * subber[row * n + col]);
+    atomicAdd(&mat[row * n + col], -(c * subber[row * n + col]));
 }
 
 __global__ void ReluKernel(float *X, float *C, int m, int n) {
@@ -97,8 +97,10 @@ __global__ void ReluKernel(float *X, float *C, int m, int n) {
 __global__ void ReluBackKernel(float *dZ, float *X, int m, int n) {
   int row = threadIdx.y + (blockIdx.y * blockDim.y);
   int col = threadIdx.x + (blockIdx.x * blockDim.x);
-  if (row < m && col < n)
-    dZ[row * n + col] *= X[row * n + col] > 0;
+  if (row < m && col < n) {
+    int idx = row * n + col;
+    X[idx] = dZ[idx] * (X[idx] > 0);
+  }
 }
 
 __global__ void VecMatDivKernel(int c, float *mat, int m, int n) {
@@ -119,6 +121,7 @@ void vecMatDiv(int c, float *mat, int m, int n) {
   dim3 gridDim(gridCols, gridRows);
 
   VecMatDivKernel<<<gridDim, blockDim>>>(c, mat, m, n);
+  CU_CHECK(cudaDeviceSynchronize());
 }
 
 __global__ void VecMatAddKernel(float *vec, float *mat, int m, int n) {
@@ -140,6 +143,7 @@ void vecMatAdd(float *vec, float *mat, int m, int n) {
   dim3 gridDim(gridCols, gridRows);
 
   VecMatAddKernel<<<gridDim, blockDim>>>(vec, mat, m, n);
+  CU_CHECK(cudaDeviceSynchronize());
 }
 
 __global__ void BasicMatMulKernel(float *A, float *B, float *C, int m, int n,

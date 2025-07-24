@@ -41,6 +41,7 @@ void matMul(float *A, float *B, float *C, int m, int n, int k) {
   dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
 
   MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize>>>(A, B, C, m, n, k);
+  CU_CHECK(cudaDeviceSynchronize());
   CU_CHECK(cudaGetLastError());
 }
 
@@ -59,6 +60,7 @@ void matMatSub(py::capsule mat, py::capsule subber, float c, int m, int n) {
   float *ptrMat = static_cast<float *>(mat.get_pointer()); // batchsize * inputs
   float *ptrSubber =
       static_cast<float *>(subber.get_pointer()); // inputs * outputs
+
   unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
   unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
   dim3 gridSize(gridCols, gridRows);      // blocks per grid
@@ -71,7 +73,7 @@ void matMatSub(py::capsule mat, py::capsule subber, float c, int m, int n) {
 
 // we're gonna pass these capsules in from python and let them handle how they
 // use the capsules we've init'd
-// assume they're already on host and we just have to perform op
+// assume they're already on device and we just have to perform op
 void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule C,
             int batch_size, int inputs, int outputs) {
   float *ptrX = static_cast<float *>(X.get_pointer()); // batchsize * inputs
@@ -112,6 +114,10 @@ void linearBack(py::capsule X, py::capsule W, py::capsule dW, py::capsule dB,
   int &m = batch_size;
   int &n = inputs;
   int &k = outputs;
+
+  // zero grads before refilling
+  cudaMemset(ptrdW, 0, n * k * sizeof(float));
+  cudaMemset(ptrdB, 0, k * sizeof(float));
 
   // calculate dW
   // (m, n).T * (m, k) = (n, k)

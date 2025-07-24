@@ -1,7 +1,7 @@
 import numpy as np
 from defs import Array
 from layer import Layer
-from native import matmul, toGPU, linear, initBuffers, linearBack, matMatSub
+from native import matmul, toCPU, toGPU, linear, initBuffers, linearBack, matMatSub
 
 
 class Linear(Layer):
@@ -47,7 +47,6 @@ class Linear(Layer):
         # XW + b -> (m, outputs) => Z
         W, b, C = self.gpuPtrs[0]
         linear(self.X, W, b, C, m, n, k)
-
         return C  # ptr to output buff
 
     def cpuForward(self):
@@ -55,18 +54,73 @@ class Linear(Layer):
 
     def backwards(self, dZ: Array):
         if self._onGPU:
-            return self.gpuBackwards()
+            return self.gpuBackwards(dZ)
         return self.cpuBackwards(dZ)
 
-    def gpuBackwards(self):
+    def gpuBackwards(self, dZ):
         m, n, k = self.batch_size, self.input_shape, self.output_shape
 
         # dZ is just the curr output buff (C)
         # we reuse the output buffer to store dZ values from layer L+1
-        w, _, dZ = self.gpuPtrs[0]
+        w, _, c = self.gpuPtrs[0]
         dW, dB = self.gpuPtrs[1]
-        linearBack(self.X, w, dW, dB, dZ, m, n, k)
-        return
+        # print("incoming dZ:", dZ)
+        # print("stored C ptr", self.gpuPtrs[0][2])
+
+        # store dX (the dZ for prev layer) in self.X ptr (the C buff for prev layer)
+        linearBack(self.X, w, dW, dB, c, m, n, k)
+        return self.X
+
+    def getData(self):
+        w, b, c = self.gpuPtrs[0]
+        dw, db = self.gpuPtrs[1]
+
+        x = toCPU(self.X, self.batch_size, self.input_shape)
+        w = toCPU(w, self.input_shape, self.output_shape)
+        b = toCPU(b, 1, self.output_shape)
+        dw = toCPU(dw, self.input_shape, self.output_shape)
+        db = toCPU(db, 1, self.output_shape)
+        c = toCPU(c, self.batch_size, self.output_shape)
+        return x, w, b, c, dw, db
+
+    def truthForward(self):
+        x, w, b, c, dw, db = self.getData()
+        return x @ w + b
+
+    def truthBackwards(self):
+        x, w, b, dZ, _, _ = self.getData()
+        m = x.shape[0]
+        dW = x.T @ dZ / m
+        # (m, outputs) -> (1, outputs)
+        dB = np.sum(dZ, axis=0, keepdims=True) / m
+        # (m, outputs) * (inputs, outputs).T -> (m, inputs)
+        dX = dZ @ w.T
+        return dW, dB, dX
+
+    def debug(self):
+        print(self)
+        w, b, c = self.gpuPtrs[0]
+        dw, db = self.gpuPtrs[1]
+
+        # print("input", self.X)
+        # print("w, b, c", w, b, c)
+        # print("dw, db", dw, db)
+        # print()
+
+        x, w, b, c, dw, db = self.getData()
+
+        tdw, tdb, tdx = self.truthBackwards()
+
+        print("========")
+        print("x/dZ\n", x[:5])
+        print("w\n", w[0, :5])
+        print()
+        print("c\n", c[0, :5])
+        print("cT\n", self.truthForward()[0, :5])
+        print()
+        print("dWT\n", tdw[:5])
+        print("dw\n", dw[:5])
+        print("=========", end="\n\n")
 
     def cpuBackwards(self, dZ: Array):
         m, _ = self.X.shape

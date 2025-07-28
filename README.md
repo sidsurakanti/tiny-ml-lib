@@ -37,7 +37,6 @@ Model(
 TRAINING...
 EPOCH 1/10, Loss: 0.1227
 ...
-EPOCH 9/10, Loss: 0.0355
 EPOCH 10/10, Loss: 0.0347
 Time spent training: 437.89s
 
@@ -97,16 +96,9 @@ Model(
 )
 
 TRAINING...
-EPOCH 1/10, Loss: 0.5499499
-EPOCH 2/10, Loss: 0.4014014
-EPOCH 3/10, Loss: 0.3486486
-EPOCH 4/10, Loss: 0.3164164
-EPOCH 5/10, Loss: 0.2933933
-EPOCH 6/10, Loss: 0.2757757
-EPOCH 7/10, Loss: 0.2610610
-EPOCH 8/10, Loss: 0.2491491
-EPOCH 9/10, Loss: 0.2388388
-EPOCH 10/10, Loss: 0.229797
+EPOCH 1/10, Loss: 0.5499
+...
+EPOCH 10/10, Loss: 0.2297
 Finished in: 9.51s
 
 EVALUATING...
@@ -134,7 +126,7 @@ Accuracy: 98.13%
 >
 > It only runs "faster" because it's lightweight.
 >
-> Still beats pytorch at batch sizes < 512 for MNIST though, so it's a win in my book.
+> Still beats pytorch at batch sizes <= 512 for MNIST though, so it's a win in my book.
 
 All benchmarks were run on a **RTX 4060**, training a simple MNIST NN from scratch using this library’s GPU backend.
 
@@ -149,7 +141,7 @@ Epochs: 10
 | 64         | PyTorch   | 27.2s            |
 | 64         | This lib  | **20.2s**        |
 | 512        | PyTorch   | 9.7s             |
-| 512        | This lib  | **10.0s**        |
+| 512        | This lib  | **9.5s**        |
 
 
 ## Why make this?

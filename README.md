@@ -128,10 +128,12 @@ Sample preds: [2 0 1 9 6 5 5 6 7 8]
 Accuracy: 98.13%
 ```
 
-# Benchmarks
+## Benchmarks
 > [!NOTE]  
-> This library doesn't have autograd (yet), graph tracing, mixed precision, cuDNN, cuBLAS, or any of the fancy stuff PyTorch does.  
-> It only runs "faster" because it's lightweight
+> This library doesn't have autograd (yet), graph tracing, mixed precision, tensor cores, cuDNN, cuBLAS, or any of the fancy stuff PyTorch does.
+>
+> It only runs "faster" because it's lightweight.
+>
 > Still beats pytorch at batch sizes < 512 for MNIST though, so it's a win in my book.
 
 All benchmarks were run on a **RTX 4060**, training a simple MNIST NN from scratch using this library’s GPU backend.

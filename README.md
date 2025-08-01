@@ -129,7 +129,7 @@ Accuracy: 98.13%
 ```
 
 # Benchmarks
-> ⚠️ **Disclaimer**  
+> [!NOTE]  
 > This library doesn't have autograd (yet), graph tracing, mixed precision, cuDNN, cuBLAS, or any of the fancy stuff PyTorch does.  
 > It only runs "faster" because it's lightweight
 > Still beats pytorch at batch sizes < 512 for MNIST though, so it's a win in my book.

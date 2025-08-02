@@ -6,7 +6,9 @@ from native import initBuff, relu, reluBack, toCPU
 
 class ReLU(Layer):
     def __init__(self, output_shape: int = 0) -> None:
-        self.X = np.zeros((0, 0))
+        self.X = np.empty(
+            (0,), dtype=np.float64
+        )  # could init this as None but my lsp is buns
         self.out = None
         self.output_shape = output_shape
         self.batch_size = 0

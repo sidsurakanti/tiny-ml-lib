@@ -37,7 +37,7 @@ print("Labels shape:", y_train.shape)
 
 
 def main():
-    BATCH_SIZE = 512
+    BATCH_SIZE = 64
 
     # sequence = [
     #     Conv2d((1, 28, 28), 5, 5),
@@ -64,10 +64,10 @@ def main():
     model = Model(sequence, loss_fn)
     # model.load("mlp-weights.pkl")
     model.toGPU(BATCH_SIZE)
-    model(10, X_train, y_train, learning_rate=1e-3, batch_size=BATCH_SIZE)
+    model(10, X_train, y_train, learning_rate=3e-2, batch_size=BATCH_SIZE)
     # model(10, cX_train, y_train, batch_size=32)
 
-    acc = model.evaluate(X_test, y_test)
+    acc = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
     # acc = model.evaluate(cX_test, y_test)
     print(f"Accuracy: {acc*100:.2f}%")
 

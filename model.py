@@ -77,26 +77,39 @@ class Model:
 
         return
 
-    def evaluate(self, X_test: Array, y_test: Array):
+    def evaluate(self, X_test: Array, y_test: Array, batch_size: int = 0):
         print("\nEVALUATING...")
         indices = np.random.permutation(len(X_test))
-        X_test, y_test = X_test[indices][:512], y_test[indices][:512]
+        X_test, y_test = X_test[indices], y_test[indices]
+        total_correct = 0
+        total_samples = 0
+        all_preds = np.empty((0,), dtype=np.uint8)
 
-        out, _ = self.forward(X_test, y_test, y_test.shape[0])
-        if self._onGPU:
-            batch_size = y_test.shape[0]
-            outputs = self.sequence[-1].output_shape
-            out = toCPU(out, batch_size, outputs)
+        for i in range(0, len(y_test), batch_size):
+            X_temp, y_temp = (
+                X_test[i : i + batch_size],
+                y_test[i : i + batch_size],
+            )
 
-        preds = np.argmax(out, axis=1)
-        correct = np.sum(preds == y_test)
-        r = np.random.randint(0, preds.shape[0])
+            out, _ = self.forward(X_temp, y_temp, y_temp.shape[0])
 
+            if self._onGPU:
+                batch_size = y_temp.shape[0]
+                outputs = self.sequence[-1].output_shape
+                out = toCPU(out, batch_size, outputs)
+
+            preds = np.argmax(out, axis=1)
+            correct = np.sum(preds == y_temp)
+            all_preds = np.concatenate([preds.astype(np.uint8), all_preds])
+
+            total_samples += y_temp.shape[0]
+            total_correct += correct
+
+        r = np.random.randint(0, total_samples)
         print("Sample labels:", y_test[r : r + 10])
-        print("Sample preds:", preds[r : r + 10])
+        print("Sample preds:", all_preds[r : r + 10])
 
-        total = y_test.shape[0]
-        return correct / total
+        return total_correct / total_samples
 
     @property
     def state_dict(self):

@@ -26,7 +26,9 @@ class Linear(ParamLayer):
         self.dW = np.zeros_like(self.W)
         self.db = np.zeros_like(self.b)
 
-        self.X = np.zeros((0, 0))  # could init this as None but my lsp is buns
+        self.X = np.empty(
+            (0,), dtype=np.float64
+        )  # could init this as None but my lsp is buns
 
     def forward(self, X: Array) -> Array:
         self.X = X  # X === gpu ptr if self._onGPU && if this layer isn't the first

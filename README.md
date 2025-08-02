@@ -1,11 +1,11 @@
 # Overview
 
-A lightweight deep learning framework built from scratch using CUDA & Python with functionality for core components like CNN and MLPs.
+A lightweight deep learning framework built from scratch using raw CUDA & Python with functionality for core components like CNN and MLPs.
 
 ## Features
 
 - Fully connected layer
-- GPU Acceleration (15x faster than regular NumPy)
+- GPU Acceleration (15x faster than regular NumPy, same speed as PyTorch for smaller stuff)
 - Convolutional layer
 - Flatten layer
 - Max pooling layer
@@ -128,12 +128,34 @@ Sample preds: [2 0 1 9 6 5 5 6 7 8]
 Accuracy: 98.13%
 ```
 
+# Benchmarks
+> ⚠️ **Disclaimer**  
+> This library doesn't have autograd (yet), graph tracing, mixed precision, cuDNN, cuBLAS, or any of the fancy stuff PyTorch does.  
+> It only runs "faster" because it's lightweight
+> Still beats pytorch at batch sizes < 512 for MNIST though, so it's a win in my book.
+
+All benchmarks were run on a **RTX 4060**, training a simple MNIST NN from scratch using this library’s GPU backend.
+
+Model:
+`Linear(784 → 512) → ReLU → Linear(512 → 512) → ReLU → Linear(512 → 512) → ReLU → Linear(512 → 10)`  
+Loss: CrossEntropy
+Optimizer: SGD, `lr=0.1`
+Epochs: 10
+
+| Batch Size | Framework | Time (10 Epochs) |
+|------------|-----------|------------------|
+| 64         | PyTorch   | 27.2s            |
+| 64         | This lib  | **20.2s**        |
+| 512        | PyTorch   | 9.7s             |
+| 512        | This lib  | **10.0s**        |
+
 
 ## Why make this?
 
 - I wanted to learn more about ml libraries and autograd (didn't get to implementing it) 
 - Wanted to implement a Convolutional layer on my own
 - Wanted to experiment with a framework and learn cool stuff
+- Didn't want to see that ugly ahh blue python color in the repo badge so I remade it in cuda too 
 
 
 ## Stack

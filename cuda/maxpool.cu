@@ -8,6 +8,13 @@ struct nchw {
   int n, c, w, h;
 };
 
+int calcOutDim(int input_size, int kernel_size, int stride, bool use_padding) {
+  if (use_padding)
+    return (input_size + stride - 1) / stride; // ceil(input / stride)
+  else
+    return (input_size - kernel_size) / stride + 1;
+}
+
 void printMat(float *mat, nchw size) {
   auto [n, c, w, h] = size;
   printf("\n");
@@ -29,10 +36,10 @@ void fillMat(float *mat, int size) {
   }
 }
 
-template <int kernel_size = 2>
+template <int max_kernel_size = 15> // workaround
 // N, C, H, W
 __global__ void MaxPoolKernel(float *in, float *out, int N, int C, int H, int W,
-                              int outH, int outW, int stride = 2) {
+                              int outH, int outW, int kernel_size, int stride) {
   // assume we use only 2d blocks
   int tx = threadIdx.x;
   int ty = threadIdx.y;
@@ -43,7 +50,7 @@ __global__ void MaxPoolKernel(float *in, float *out, int N, int C, int H, int W,
   int bx = blockIdx.x;
 
   // works for 1 channel
-  float buffer[kernel_size][kernel_size];
+  float buffer[max_kernel_size][max_kernel_size];
 
   int batch = bz * blockDim.z; // assume tz == 0 (n)
   // row, col for out matrix
@@ -64,7 +71,12 @@ __global__ void MaxPoolKernel(float *in, float *out, int N, int C, int H, int W,
       for (int j = 0; j < kernel_size; j++) {
         int row = rowStart + i;
         int col = colStart + j;
-        buffer[i][j] = in[((batch * C * H * W) + (c * H * W)) + row * W + col];
+        int idx = ((batch * C * H * W) + (c * H * W)) + row * W + col;
+
+        if (row >= H || col >= W) // padding for edge cases
+          buffer[i][j] = 0.0f;
+        else
+          buffer[i][j] = in[idx];
       }
     }
 
@@ -88,17 +100,30 @@ int main() {
   std::cout << "launching gpu kernel..." << std::endl;
 
   // N, H, W (we're gonna just put in C in the kernel)
-  nchw dimsIn{2, 2, 4, 4};
+  nchw dimsIn{2000, 256, 28, 28};
   int sizeIn = dimsIn.n * dimsIn.c * dimsIn.h * dimsIn.w;
   int memsizeIn = sizeIn * sizeof(float);
   float *in_h;
 
   CU_CHECK(cudaMallocHost(&in_h, memsizeIn));
+  int kernelSize = 2;
+  int stride = 2;
 
-  nchw dimsOut{dimsIn.n, dimsIn.c, 2, 2};
+  nchw dimsOut{dimsIn.n, dimsIn.c,
+               calcOutDim(dimsIn.h, kernelSize, stride, true),
+               calcOutDim(dimsIn.w, kernelSize, stride, true)};
   int sizeOut = dimsOut.n * dimsOut.c * dimsOut.h * dimsOut.w;
   int memsizeOut = sizeOut * sizeof(float);
   float *out_h;
+
+  cudaEvent_t start, stop;
+  float elapsed;
+  CU_CHECK(cudaEventCreate(&start));
+  CU_CHECK(cudaEventCreate(&stop));
+
+  printf("[RUNNING] MaxPool\n");
+  CU_CHECK(cudaEventRecord(start));
+
   CU_CHECK(cudaMallocHost(&out_h, memsizeOut));
 
   fillMat(in_h, sizeIn);
@@ -116,19 +141,30 @@ int main() {
   cudaMalloc(&out_d, memsizeOut);
   cudaMemcpy(in_d, in_h, memsizeIn, cudaMemcpyHostToDevice);
 
-  MaxPoolKernel<<<gridDim, blockDim>>>(in_d, out_d, dimsIn.n, dimsIn.c,
-                                       dimsIn.h, dimsIn.w, dimsOut.h,
-                                       dimsOut.w);
-  CU_CHECK(cudaDeviceSynchronize());
-
-  cudaMemcpy(out_h, out_d, memsizeOut, cudaMemcpyDeviceToHost);
-
   printf("in shape (%d, %d, %d, %d)\n", dimsIn.n, dimsIn.c, dimsIn.h, dimsIn.w);
   printf("out shape (%d, %d, %d, %d)\n", dimsOut.n, dimsOut.c, dimsOut.h,
          dimsOut.w);
-  printMat(in_h, dimsIn);
-  printf("\n");
-  printMat(out_h, dimsOut);
+
+  MaxPoolKernel<<<gridDim, blockDim>>>(in_d, out_d, dimsIn.n, dimsIn.c,
+                                       dimsIn.h, dimsIn.w, dimsOut.h, dimsOut.w,
+                                       kernelSize, stride);
+
+  CU_CHECK(cudaDeviceSynchronize());
+
+  CU_CHECK(cudaEventRecord(stop));
+  CU_CHECK(cudaEventSynchronize(stop));
+  CU_CHECK(cudaEventElapsedTime(&elapsed, start, stop));
+
+  printf("[TIME] Completed in %.2fms.\n", elapsed);
+
+  CU_CHECK(cudaEventDestroy(start));
+  CU_CHECK(cudaEventDestroy(stop));
+
+  cudaMemcpy(out_h, out_d, memsizeOut, cudaMemcpyDeviceToHost);
+
+  // printMat(in_h, dimsIn);
+  // printf("\n");
+  // printMat(out_h, dimsOut);
 
   std::cout << "job finished!" << std::endl;
   return 0;

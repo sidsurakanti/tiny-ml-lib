@@ -1,9 +1,9 @@
-*.cpp linguist-detectable=true
-*.cu linguist-detectable=true
-*.cuh linguist-detectable=true
-*.h linguist-detectable=true
+*.cpp linguist-language=C++
+*.h linguist-language=C++
+*.cmake linguist-language=CMake
 
 CMakeLists.txt linguist-detectable=true
+CMakeLists.txt linguist-language=CMake
 *.cmake linguist-detectable=true
 
-README.md linguist-documentation=true
+*.md lingust-documentation=false

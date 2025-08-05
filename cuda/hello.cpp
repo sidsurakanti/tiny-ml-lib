@@ -3,8 +3,8 @@
 
 namespace py = pybind11;
 
-std::string hello(std::string name, int n) {
-  return "Hello, " + name + ". [#" + std::to_string(n) + "]";
+std::string hello(std::string name) {
+  return "Hello, " + name + ".";
 }
 
 void init_hello(py::module_ &m) {

@@ -1,0 +1,9 @@
+*.cpp linguist-detectable=true
+*.cu linguist-detectable=true
+*.cuh linguist-detectable=true
+*.h linguist-detectable=true
+
+CMakeLists.txt linguist-detectable=true
+*.cmake linguist-detectable=true
+
+README.md linguist-documentation=true

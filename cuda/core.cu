@@ -1,5 +1,10 @@
+#include "activations.cuh"
+#include "common.cuh"
 #include "errors.cuh"
-#include "matmul.cuh"
+#include "mat_ops.cuh"
+#include "maxpool.cuh"
+#include "maxpool_utils.hpp"
+
 #include <cstdlib>
 #include <cuda_runtime.h>
 #include <pybind11/numpy.h>
@@ -9,65 +14,6 @@
 namespace py = pybind11;
 
 const int BLOCK_SIZE = 16;
-typedef typename py::array_t<float, py::array::c_style | py::array::forcecast>
-    py_ndarray_t;
-
-py::capsule makeCapsule(void *ptr, bool isCudaPtr) {
-  auto deleter =
-      isCudaPtr ? [](void *p) { cudaFree(p); } : [](void *p) { free(p); };
-
-  return py::capsule(ptr, deleter);
-}
-
-float *matTranspose(float *mat, int m, int n) {
-  // create output buff
-  float *buf;
-  CU_CHECK(cudaMalloc(&buf, m * n * sizeof(float)));
-
-  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 gridDim(gridCols, gridRows);      // blocks per grid
-  dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-  MatTransposeKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(mat, buf, m, n);
-  CU_CHECK(cudaDeviceSynchronize());
-  CU_CHECK(cudaGetLastError());
-  return buf;
-}
-
-void matMul(float *A, float *B, float *C, int m, int n, int k) {
-  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  unsigned int gridCols = (k + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 gridSize(gridCols, gridRows);      // blocks per grid
-  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-
-  MatMulKernel<BLOCK_SIZE><<<gridSize, blockSize>>>(A, B, C, m, n, k);
-  CU_CHECK(cudaGetLastError());
-}
-
-// equiv to np.sum(mat, axis=0)
-void matSum(float *mat, float *dst, int m, int n) {
-  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 gridSize(gridCols, gridRows);      // blocks per grid
-  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-  MatSumKernel<<<gridSize, blockSize>>>(mat, dst, m, n);
-  CU_CHECK(cudaGetLastError());
-}
-
-// mat A - B
-void matMatSub(py::capsule mat, py::capsule subber, float c, int m, int n) {
-  float *ptrMat = static_cast<float *>(mat.get_pointer()); // batchsize * inputs
-  float *ptrSubber =
-      static_cast<float *>(subber.get_pointer()); // inputs * outputs
-
-  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  unsigned int gridCols = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 gridSize(gridCols, gridRows);      // blocks per grid
-  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-
-  MatMatSubKernel<<<gridSize, blockSize>>>(ptrMat, ptrSubber, c, m, n);
-  CU_CHECK(cudaGetLastError());
-}
 
 // we're gonna pass these capsules in from python and let them handle how they
 // use the capsules we've init'd
@@ -83,12 +29,7 @@ void linear(py::capsule X, py::capsule W, py::capsule b, py::capsule C,
   int &n = inputs;
   int &k = outputs;
 
-  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  unsigned int gridCols = (k + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 gridDim(gridCols, gridRows);      // blocks per grid
-  dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-
-  MatMulKernel<BLOCK_SIZE><<<gridDim, blockDim>>>(ptrX, ptrW, ptrC, m, n, k);
+  matMul(ptrX, ptrW, ptrC, m, n, k);
 
   // dont have to cuda dev sync here because everything in the same thread runs
   // sequentially
@@ -201,13 +142,7 @@ py::array npMatMul(py_ndarray_t A, py_ndarray_t B, int m, int n, int k) {
   CU_CHECK(
       cudaMemcpyAsync(B_d, B_h, mem_sizeB, cudaMemcpyHostToDevice, stream));
 
-  unsigned int gridRows = (m + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  unsigned int gridCols = (k + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  dim3 gridSize(gridCols, gridRows);      // blocks per grid
-  dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE); // threads per block
-
-  MatMulKernel<BLOCK_SIZE>
-      <<<gridSize, blockSize, 1, stream>>>(A_d, B_d, C_d, m, n, k);
+  matMul(A_d, B_d, C_d, m, n, k);
 
   // wait host thread & error check
   CU_CHECK(cudaGetLastError());
@@ -315,25 +250,62 @@ auto initBuffers(py_ndarray_t W, int input_size, int output_size,
   return std::make_tuple(w, b, c, dw, db);
 }
 
-void init_matmul(py::module_ &m) {
+py::array maxPoolCpuRes(py_ndarray_t input, int n, int w, int c, int h,
+                        int kernel_size = 2, int stride = 2,
+                        bool use_padding = true) {
+  const float *in_h = input.unchecked<1>().data(0); // ptr to A[0]
+  nchw dimsIn{n, c, h, w};
+  int sizeIn = dimsIn.n * dimsIn.c * dimsIn.h * dimsIn.w;
+  int memsizeIn = sizeIn * sizeof(float);
+
+  nchw dimsOut{dimsIn.n, dimsIn.c,
+               calcOutDim(dimsIn.h, kernel_size, stride, use_padding),
+               calcOutDim(dimsIn.w, kernel_size, stride, use_padding)};
+
+  int sizeOut = dimsOut.n * dimsOut.c * dimsOut.h * dimsOut.w;
+  int memsizeOut = sizeOut * sizeof(float);
+  float *out_h;
+
+  CU_CHECK(cudaMallocHost(&out_h, memsizeOut));
+
+  int BLOCK_SIZE = 16;
+  int gridRows = (dimsOut.h + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  int gridCols = (dimsOut.w + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  // n, ceil(out_h) / block_size, same for w
+  dim3 gridDim(gridCols, gridRows, dimsOut.n); // blocks in grid
+  dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE);       // threads in block
+
+  float *in_d, *out_d;
+  cudaMalloc(&in_d, memsizeIn);
+  cudaMalloc(&out_d, memsizeOut);
+  cudaMemcpy(in_d, in_h, memsizeIn, cudaMemcpyHostToDevice);
+
+  MaxPoolKernel<<<gridDim, blockDim>>>(in_d, out_d, dimsIn.n, dimsIn.c,
+                                       dimsIn.h, dimsIn.w, dimsOut.h, dimsOut.w,
+                                       kernel_size, stride);
+
+  cudaMemcpy(out_h, out_d, memsizeOut, cudaMemcpyDeviceToHost);
+
+  py::capsule free_when_done = makeCapsule(out_h, false);
+  py::array_t<float> result =
+      py::array_t<float>({dimsOut.n, dimsOut.c, dimsOut.h, dimsOut.w}, // shape
+                         out_h, // data ptr
+                         free_when_done);
+
+  return result;
+}
+
+void init_core(py::module_ &m) {
   m.def("toGPU", &toGPU);
   m.def("toCPU", &toCPU);
   m.def("updateGpuMemory", &updateGpuMemory);
   m.def("initBuff", &initBuff);
   m.def("initBuffers", &initBuffers);
-  m.def("linear", &linear);
-  m.def("linearBack", &linearBack);
   m.def("matMatSub", &matMatSub);
   m.def("relu", &relu);
   m.def("reluBack", &reluBack);
-  m.def("matmul", &npMatMul,
-        "Matrix multiplication: A @ B = C\n"
-        "Args:\n"
-        "  A: 1D array, shape (m*n) representing (m, n) matrix in row-major "
-        "order\n"
-        "  B: 1D array, shape (n*k) representing (n, k) matrix in row-major "
-        "order\n"
-        "  m, n, k: matrix dimensions\n"
-        "Returns:\n"
-        "  C: 2D array, shape (m, k)");
+  m.def("linear", &linear);
+  m.def("linearBack", &linearBack);
+  m.def("matmul", &npMatMul);
+  m.def("maxpool", &maxPoolCpuRes);
 }

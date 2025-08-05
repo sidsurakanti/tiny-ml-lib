@@ -100,7 +100,7 @@ class Model:
 
             preds = np.argmax(out, axis=1)
             correct = np.sum(preds == y_temp)
-            all_preds = np.concatenate([preds.astype(np.uint8), all_preds])
+            all_preds = np.concatenate([all_preds, preds.astype(np.uint8)])
 
             total_samples += y_temp.shape[0]
             total_correct += correct

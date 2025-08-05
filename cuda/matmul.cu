@@ -1,10 +1,11 @@
-#include "errors.cuh"
-#include "matmul.cuh"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
 #include <iostream>
+
+#include "errors.cuh"
+#include "matmul.cuh"
 
 // ** lowk this file has a lot of dumb comments but that's js me thinking
 // ** feel free to ignore it it's a whole yap city down there
@@ -43,107 +44,6 @@ void cpuMatMul(float *A, float *B, float *C, int m, int n, int k) {
       }
     }
   }
-}
-
-template <int block_size>
-__global__ void MatTransposeKernel(float *mat, float *buf, int m, int n) {
-  int ty = threadIdx.y;
-  int tx = threadIdx.x;
-  int row = ty + (blockIdx.y * blockDim.y);
-  int col = tx + (blockIdx.x * blockDim.x);
-
-  __shared__ float tile[block_size][block_size];
-
-  // load element into shared mem
-  if (row < m && col < n)
-    tile[ty][tx] = mat[row * n + col];
-  else
-    tile[ty][tx] = 0.0f;
-
-  __syncthreads();
-
-  if (row < m && col < n)
-    buf[col * m + row] = tile[ty][tx];
-}
-
-__global__ void MatSumKernel(float *mat, float *dst, int m, int n) {
-  int row = threadIdx.y + (blockIdx.y * blockDim.y);
-  int col = threadIdx.x + (blockIdx.x * blockDim.x);
-
-  if (row < m && col < n)
-    atomicAdd(&dst[col], mat[row * n + col]);
-}
-
-__global__ void MatMatSubKernel(float *mat, float *subber, float c, int m,
-                                int n) {
-  int row = threadIdx.y + (blockIdx.y * blockDim.y);
-  int col = threadIdx.x + (blockIdx.x * blockDim.x);
-
-  if (row < m && col < n)
-    atomicAdd(&mat[row * n + col], -(c * subber[row * n + col]));
-}
-
-__global__ void ReluKernel(float *X, float *C, int m, int n) {
-  int row = threadIdx.y + (blockIdx.y * blockDim.y);
-  int col = threadIdx.x + (blockIdx.x * blockDim.x);
-
-  if (row >= m || col >= n)
-    return;
-
-  float &value = X[row * n + col];
-  C[row * n + col] = value > 0 ? value : 0;
-}
-
-__global__ void ReluBackKernel(float *dZ, float *X, int m, int n) {
-  int row = threadIdx.y + (blockIdx.y * blockDim.y);
-  int col = threadIdx.x + (blockIdx.x * blockDim.x);
-  if (row < m && col < n) {
-    int idx = row * n + col;
-    X[idx] = dZ[idx] * (X[idx] > 0);
-  }
-}
-
-__global__ void VecMatDivKernel(int c, float *mat, int m, int n) {
-  int row = threadIdx.y + (blockIdx.y * blockDim.y);
-  int col = threadIdx.x + (blockIdx.x * blockDim.x);
-
-  if (row >= m || col >= n)
-    return;
-
-  mat[row * n + col] /= c;
-}
-
-void vecMatDiv(int c, float *mat, int m, int n) {
-  int block_size = 32;
-  dim3 blockDim(block_size, block_size);
-  unsigned int gridRows = (m + block_size - 1) / block_size;
-  unsigned int gridCols = (n + block_size - 1) / block_size;
-  dim3 gridDim(gridCols, gridRows);
-
-  VecMatDivKernel<<<gridDim, blockDim>>>(c, mat, m, n);
-  CU_CHECK(cudaDeviceSynchronize());
-}
-
-__global__ void VecMatAddKernel(float *vec, float *mat, int m, int n) {
-  int row = threadIdx.y + (blockIdx.y * blockDim.y);
-  int col = threadIdx.x + (blockIdx.x * blockDim.x);
-
-  if (row >= m || col >= n)
-    return;
-
-  mat[row * n + col] += vec[col];
-}
-
-// make sure vec and mat are 1d row majored otherwise you're cooked bro
-void vecMatAdd(float *vec, float *mat, int m, int n) {
-  int block_size = 32;
-  dim3 blockDim(block_size, block_size);
-  unsigned int gridRows = (m + block_size - 1) / block_size;
-  unsigned int gridCols = (n + block_size - 1) / block_size;
-  dim3 gridDim(gridCols, gridRows);
-
-  VecMatAddKernel<<<gridDim, blockDim>>>(vec, mat, m, n);
-  CU_CHECK(cudaDeviceSynchronize());
 }
 
 __global__ void BasicMatMulKernel(float *A, float *B, float *C, int m, int n,
@@ -399,15 +299,9 @@ void matMul() {
   cudaFreeHost(B_h);
 }
 
-// explicit declarations
-template __global__ void MatTransposeKernel<16>(float *mat, float *buf, int m, int n);
 template __global__ void MatMulKernel<16>(float *A, float *B, float *C, int m, int n, int k);
-__global__ void MatMatSubKernel(float *mat, float *subber, float c, int m,
-                                int n);
 
-int main() {
-  std::cout << "[CUDA] Launching matrix multiplication kernel...\n";
-
+void deviceProps() {
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
 
@@ -418,10 +312,16 @@ int main() {
   std::cout << "WARP SIZE: " << prop.warpSize << std::endl;
   std::cout << "SHARED MEMORY / BLOCK: " << prop.sharedMemPerBlock / (1024) << "KB" << std::endl;
   std::cout << "GLOBAL MEMORY: " << prop.totalGlobalMem / (1024*1024*1024) << "GB" << std::endl;
-
-  matMul();
-
-  std::cout << "[END]" << std::endl;
-  return 0;
 }
+
+// int main() {
+//   std::cout << "[CUDA] Launching matrix multiplication kernel...\n";
+//
+//   deviceProps();
+//   matMul();
+//
+//   std::cout << "[END]" << std::endl;
+//
+//   return 0;
+// }
 

@@ -14,6 +14,9 @@ add_subdirectory(extern/pybind11)
 pybind11_add_module(lib
   cuda/lib.cpp
   cuda/core.cu
+  cuda/mat_ops.cu
+  cuda/maxpool.cu
+  cuda/activations.cu
   cuda/matmul.cu
   cuda/hello.cpp
 )

@@ -17,6 +17,7 @@ np.set_printoptions(linewidth=200)
 test = pd.read_csv("./dataset/test.csv")
 train = pd.read_csv("./dataset/train.csv")
 
+# print(train.head())
 test = np.array(test.T)
 train = np.array(train.T)
 

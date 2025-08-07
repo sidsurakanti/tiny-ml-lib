@@ -1,12 +1,12 @@
 # Overview
 
-A lightweight deep learning framework built from scratch using raw CUDA & Python with functionality for core components like CNN and MLPs.
+A lightweight deep learning framework built from scratch using raw CUDA with a friendly Python API including all necessary functionality for core DL components.
 
 ## Features
 
 - Fully connected layer
-- GPU Acceleration (15x faster than regular NumPy, same speed as PyTorch for smaller stuff)
 - Convolutional layer
+- GPU Acceleration (15x faster than regular NumPy, same speed as PyTorch for smaller stuff)
 - Flatten layer
 - Max pooling layer
 - ReLU activation
@@ -23,6 +23,7 @@ Convolutional NN  on MNIST
 >>> py main.py
 Input shape: (60000, 784)
 Labels shape: (60000,)
+
 Model(
   [0] Conv2d       ((1, 28, 28) → (5, 24, 24))
   [1] ReLU
@@ -51,12 +52,10 @@ Saved model weights to cnn-weights.pkl
 ```
 With MaxPool (GPU ver.)
 ```bash
-Input shape: (60000, 784)
-Labels shape: (60000,)
 Model(
   [0] Conv2d       ((1, 28, 28) → (5, 24, 24))
   [1] ReLU
-  [2] MaxPool
+  [2] MaxPool # on gpu
   [3] Flatten
   [4] Linear       (720 → 128)
   [5] ReLU
@@ -68,9 +67,7 @@ Model(
 
 TRAINING...
 EPOCH 1/5, Loss: 1.75497549
-EPOCH 2/5, Loss: 0.75797579
-EPOCH 3/5, Loss: 0.53465346
-EPOCH 4/5, Loss: 0.45654565
+...
 EPOCH 5/5, Loss: 0.41454145
 Finished in: 492.62s # CPU time 1200s
 
@@ -78,8 +75,6 @@ EVALUATING...
 Sample labels: [8 5 6 4 2 4 2 4 1 3]
 Sample preds: [8 5 6 4 4 4 2 4 1 3]
 Accuracy: 89.95%
-
-Save weights? (y/n) >>> n
 ```
 
 MLP on MNIST (GPU)
@@ -137,8 +132,11 @@ All benchmarks were run on a **RTX 4060**, training a simple MNIST NN from scrat
 
 Model:
 `Linear(784 → 512) → ReLU → Linear(512 → 512) → ReLU → Linear(512 → 512) → ReLU → Linear(512 → 10)`  
+
 Loss: CrossEntropy
+
 Optimizer: SGD, `lr=0.1`
+
 Epochs: 10
 
 | Batch Size | Framework | Time (10 Epochs) |
@@ -151,10 +149,9 @@ Epochs: 10
 
 ## Why make this?
 
-- I wanted to learn more about ml libraries and autograd (didn't get to implementing it) 
-- Wanted to implement a Convolutional layer on my own
-- Wanted to experiment with a framework and learn cool stuff
-- Didn't want to see that ugly ahh blue python color in the repo badge so I remade it in cuda too 
+- GPU programming seemed like a really fun problem space
+- Implement a bunch of things on my own
+- Experiment with a framework and learn cool stuff
 
 
 ## Stack
@@ -166,7 +163,7 @@ Epochs: 10
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.10+
 - pip
 - CUDA Toolkit 
 - CMake
@@ -178,7 +175,7 @@ Clone the repo:
 
 ```bash
 git clone https://github.com/sidsurakanti/tiny-ml-lib.git
-cd repo
+cd tiny-ml-lib
 ```
 
 Create a virtual environment (optional but recommended):
@@ -194,14 +191,14 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Build core cuda lib
+Build core CUDA lib
 ```bash
 mkdir build && cd build
 cmake .. && make && make install
 cd ..
 ```
 
-Run the app
+Run it
 
 ```bash
 python3 main.py
@@ -219,8 +216,8 @@ python main.py
 - [x] Add Conv2d
 - [x] Add pooling layer
 - [x] Add weight inits
-- [ ] Add more activations etc
 - [x] Cuda remake
+- [ ] Add more activations etc
 
 ## Support
 

@@ -31,7 +31,7 @@ class Conv2d(ParamLayer):
             (input_width - filter_size // stride + 1),
         )
 
-        self.X = None
+        self.X = np.empty(0)
         self.out = None
 
         INITS = {

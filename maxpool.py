@@ -2,6 +2,7 @@ import numpy as np
 from defs import Array
 from layer import Layer
 from math import ceil
+from native import maxpool
 
 
 class MaxPool(Layer):
@@ -9,12 +10,20 @@ class MaxPool(Layer):
         self._X = None
         self.mask = np.zeros((0, 0))
         self.arg_idxs = []
-        self.onGPU = False
+        self.mask_idxs = np.empty(0, np.int64)  # for gpu use
+        self._onGPU = False
 
     def forward(self, X: Array):
         self.X = X
+
         # presume x is of (5, 3, 28, 28)
         filters, channels, h, w = self.X.shape
+
+        if self._onGPU:
+            res, idxs = maxpool(X.reshape(-1), filters, channels, h, w, 2, 2, True)
+            self.mask_idxs = idxs
+            return res
+
         nh, nw = ceil(h / 2), ceil(w / 2)
         res = np.zeros((filters, channels, nh, nw))
 
@@ -41,9 +50,14 @@ class MaxPool(Layer):
         return res
 
     def backwards(self, dZ) -> Array:
-        idxs = np.array(self.arg_idxs).T
-        self.mask[tuple(idxs)] = dZ.flatten()
-        self.arg_idxs = []  # reset
+        if self._onGPU:
+            coords = np.unravel_index(self.mask_idxs.flatten(), self.mask.shape)
+            self.mask[coords] = dZ.flatten()
+        else:
+            idxs = np.array(self.arg_idxs).T
+            self.mask[tuple(idxs)] = dZ.flatten()
+            self.arg_idxs = []  # reset
+
         return self.mask
 
     @property
@@ -56,7 +70,8 @@ class MaxPool(Layer):
         self._X = val
 
     def toGPU(self):
-        assert False, "No GPU implementation for Convolutional Layer yet"
+        self._onGPU = True
+        # assert False, "No GPU implementation for Convolutional Layer yet"
 
     def __repr__(self):
         return f"<MaxPool>"

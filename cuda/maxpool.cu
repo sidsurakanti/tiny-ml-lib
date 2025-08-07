@@ -6,7 +6,8 @@
 // N, C, H, W
 template <int max_kernel_size> // workaround
 __global__ void MaxPoolKernel(float *in, float *out, int N, int C, int H, int W,
-                              int outH, int outW, int kernel_size, int stride) {
+                              int outH, int outW, int kernel_size, int stride,
+                              int *backwards_mask) {
   // assume we use only 2d blocks
   int tx = threadIdx.x;
   int ty = threadIdx.y;
@@ -29,40 +30,55 @@ __global__ void MaxPoolKernel(float *in, float *out, int N, int C, int H, int W,
 
   int rowStart = outRow * stride;
   int colStart = outCol * stride;
+  int batchIdx = (batch * C * H * W);
 
   // processing each channel is very small amount of work for each thread
   // so we can make it work on all the channels (reasonably < 512)
   for (int c = 0; c < C; c++) {
-    // load kernel into buffer
+    int chanIdx = batchIdx + (c * H * W);
+
+    // load kernel on buff
     for (int i = 0; i < kernel_size; i++) {
+      int row = rowStart + i;
+      int rowIdx = rowStart * W;
+
       for (int j = 0; j < kernel_size; j++) {
-        int row = rowStart + i;
         int col = colStart + j;
-        int idx = ((batch * C * H * W) + (c * H * W)) + row * W + col;
 
         if (row >= H || col >= W) // padding for edge cases
           buffer[i][j] = 0.0f;
         else
-          buffer[i][j] = in[idx];
+          buffer[i][j] = in[chanIdx + rowIdx + col];
       }
     }
 
     // apply maxpool on the buffer
     float max = -CUDART_INF;
+    int max_idx[2] = {};
     for (int i = 0; i < kernel_size; i++) {
       for (int j = 0; j < kernel_size; j++) {
-        max = fmaxf(buffer[i][j], max);
+        if (buffer[i][j] > max) {
+          max = buffer[i][j];
+          max_idx[0] = i;
+          max_idx[1] = j;
+        }
       }
     }
 
-    // printf("%f", max);
+    // set backwards mask so we can use it for backprop
+    int out_idx = ((batch * C * outH * outW) + (c * outH * outW)) +
+                  (outRow * outW) + outCol;
 
     // add res to output buf
-    out[((batch * C * outH * outW) + (c * outH * outW)) + (outRow * outW) +
-        outCol] = max;
+    out[out_idx] = max;
+    backwards_mask[out_idx] =
+        chanIdx + (rowStart + max_idx[0]) * W + (colStart + max_idx[1]);
+
+    // printf("%f", max);
   }
 }
 
 template __global__ void MaxPoolKernel<15>(float *in, float *out, int N, int C,
                                            int H, int W, int outH, int outW,
-                                           int kernel_size, int stride);
+                                           int kernel_size, int stride,
+                                           int *backwards_mask);

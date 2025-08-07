@@ -49,8 +49,10 @@ Save weights? (y/n) >>> y
 File name? (empty for default) >>> cnn-weights
 Saved model weights to cnn-weights.pkl
 ```
-With MaxPool (didn't bother running for longer than 5 epochs cus it's slow asf)
+With MaxPool (GPU ver.)
 ```bash
+Input shape: (60000, 784)
+Labels shape: (60000,)
 Model(
   [0] Conv2d       ((1, 28, 28) → (5, 24, 24))
   [1] ReLU
@@ -61,20 +63,23 @@ Model(
   [6] Linear       (128 → 10)
   Loss: CrossEntropyLoss
   Total parameters: 96,583
+  Device: CPU
 )
 
 TRAINING...
-EPOCH 1/5, Loss: 0.6285
-EPOCH 2/5, Loss: 0.4906
-EPOCH 3/5, Loss: 0.3883
-EPOCH 4/5, Loss: 0.3109
-EPOCH 5/5, Loss: 0.3366
-Time spent training: 1116.21s
+EPOCH 1/5, Loss: 1.75497549
+EPOCH 2/5, Loss: 0.75797579
+EPOCH 3/5, Loss: 0.53465346
+EPOCH 4/5, Loss: 0.45654565
+EPOCH 5/5, Loss: 0.41454145
+Finished in: 492.62s # CPU time 1200s
 
 EVALUATING...
-Sample labels: [4 9 5 0 6 0 7 9 8 8]
-Sample preds: [4 9 5 0 6 0 9 9 8 8]
-Accuracy: 87.67%
+Sample labels: [8 5 6 4 2 4 2 4 1 3]
+Sample preds: [8 5 6 4 4 4 2 4 1 3]
+Accuracy: 89.95%
+
+Save weights? (y/n) >>> n
 ```
 
 MLP on MNIST (GPU)

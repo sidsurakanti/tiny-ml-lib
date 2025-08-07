@@ -250,9 +250,9 @@ auto initBuffers(py_ndarray_t W, int input_size, int output_size,
   return std::make_tuple(w, b, c, dw, db);
 }
 
-py::array maxPoolCpuRes(py_ndarray_t input, int n, int w, int c, int h,
-                        int kernel_size = 2, int stride = 2,
-                        bool use_padding = true) {
+auto maxPoolCpuRes(py_ndarray_t input, int n, int c, int h, int w,
+                   int kernel_size = 2, int stride = 2,
+                   bool use_padding = true) {
   const float *in_h = input.unchecked<1>().data(0); // ptr to A[0]
   nchw dimsIn{n, c, h, w};
   int sizeIn = dimsIn.n * dimsIn.c * dimsIn.h * dimsIn.w;
@@ -264,9 +264,13 @@ py::array maxPoolCpuRes(py_ndarray_t input, int n, int w, int c, int h,
 
   int sizeOut = dimsOut.n * dimsOut.c * dimsOut.h * dimsOut.w;
   int memsizeOut = sizeOut * sizeof(float);
+  int memsizeMask = sizeOut * sizeof(int);
+
   float *out_h;
+  int *backwards_mask; // same size as input use for backwards
 
   CU_CHECK(cudaMallocHost(&out_h, memsizeOut));
+  CU_CHECK(cudaMallocHost(&backwards_mask, memsizeMask));
 
   int BLOCK_SIZE = 16;
   int gridRows = (dimsOut.h + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -276,23 +280,36 @@ py::array maxPoolCpuRes(py_ndarray_t input, int n, int w, int c, int h,
   dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE);       // threads in block
 
   float *in_d, *out_d;
+  int *mask_d;
   cudaMalloc(&in_d, memsizeIn);
   cudaMalloc(&out_d, memsizeOut);
+  cudaMalloc(&mask_d, memsizeMask);
+
+  cudaMemset(mask_d, 0, memsizeMask);
   cudaMemcpy(in_d, in_h, memsizeIn, cudaMemcpyHostToDevice);
 
   MaxPoolKernel<<<gridDim, blockDim>>>(in_d, out_d, dimsIn.n, dimsIn.c,
                                        dimsIn.h, dimsIn.w, dimsOut.h, dimsOut.w,
-                                       kernel_size, stride);
+                                       kernel_size, stride, mask_d);
 
   cudaMemcpy(out_h, out_d, memsizeOut, cudaMemcpyDeviceToHost);
+  cudaMemcpy(backwards_mask, mask_d, memsizeMask, cudaMemcpyDeviceToHost);
 
-  py::capsule free_when_done = makeCapsule(out_h, false);
   py::array_t<float> result =
       py::array_t<float>({dimsOut.n, dimsOut.c, dimsOut.h, dimsOut.w}, // shape
                          out_h, // data ptr
-                         free_when_done);
+                         makeCapsule(out_h, false, true));
 
-  return result;
+  py::array_t<int> mask =
+      py::array_t<int>({dimsOut.n, dimsOut.c, dimsOut.h, dimsOut.w}, // shape
+                       backwards_mask,                               // data ptr
+                       makeCapsule(backwards_mask, false, true));
+
+  cudaFree(in_d);
+  cudaFree(out_d);
+  cudaFree(mask_d);
+
+  return py::make_tuple(result, mask);
 }
 
 void init_core(py::module_ &m) {

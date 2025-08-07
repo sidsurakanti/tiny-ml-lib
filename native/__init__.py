@@ -11,6 +11,7 @@ from .lib import (
     relu,
     reluBack,
     matMatSub,
+    maxpool,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "toCPU",
     "initBuff",
     "matMatSub",
+    "maxpool",
 ]

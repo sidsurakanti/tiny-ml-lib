@@ -85,6 +85,8 @@ class Model:
         total_samples = 0
         all_preds = np.empty((0,), dtype=np.uint8)
 
+        batch_size = len(y_test) if batch_size == 0 else batch_size
+
         for i in range(0, len(y_test), batch_size):
             X_temp, y_temp = (
                 X_test[i : i + batch_size],

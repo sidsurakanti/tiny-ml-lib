@@ -2,10 +2,10 @@
 *.h linguist-language=C++
 *.cu linguist-language=CUDA
 
-*.cmake linguist-detectable=false
+*.cmake linguist-detectable=true
 *.cmake linguist-language=CMake
 
-CMakeLists.txt linguist-detectable=false
+CMakeLists.txt linguist-detectable=true
 CMakeLists.txt linguist-language=CMake
 
 *.md linguist-documentation=false

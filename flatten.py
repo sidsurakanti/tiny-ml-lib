@@ -15,7 +15,8 @@ class Flatten(Layer):
         return out.reshape(self.old_shape)
 
     def toGPU(self):
-        assert False, "No GPU implementation for Convolutional Layer yet"
+        self._onGPU = True
+        # assert False, "No GPU implementation for Convolutional Layer yet"
 
     def __repr__(self):
         return f"<Flatten>"

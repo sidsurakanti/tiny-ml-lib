@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from numpy.typing import NDArray
 import numpy as np
-from typing import Any
+from typing import Any, Union
 
 
 class Layer(ABC):
@@ -10,7 +10,7 @@ class Layer(ABC):
         pass
 
     @abstractmethod
-    def backwards(self, *args, **kwargs) -> None | NDArray[np.float64]:
+    def backwards(self, *args, **kwargs) -> Union[None, NDArray[np.float64]]:
         pass
 
     @abstractmethod

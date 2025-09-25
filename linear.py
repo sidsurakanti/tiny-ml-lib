@@ -8,7 +8,7 @@ class Linear(ParamLayer):
     def __init__(self, inputs: int, outputs: int, init: str = "he") -> None:
         INITS = {
             "he": np.sqrt(2 / inputs),
-            "xavier": np.sqrt(6 / (inputs + outputs)),
+            "xavier": np.sqrt(2 / (inputs + outputs)),
             "none": 1,
         }
 
@@ -25,6 +25,9 @@ class Linear(ParamLayer):
 
         self.dW = np.zeros_like(self.W)
         self.db = np.zeros_like(self.b)
+
+        self.velocity = np.zeros_like(self.W)
+        self.velocity_b = np.zeros_like(self.b)
 
         self.X = np.empty(
             (0,), dtype=np.float64
@@ -84,7 +87,7 @@ class Linear(ParamLayer):
 
         return dX
 
-    def step(self, learning_rate: float = 0.03) -> None:
+    def step(self, learning_rate: float = 0.03, momentum: float = 0.9) -> None:
         if self._onGPU:
             W, b, _ = self.gpuPtrs[0]
             dW, dB = self.gpuPtrs[1]
@@ -92,8 +95,11 @@ class Linear(ParamLayer):
             matMatSub(b, dB, learning_rate, 1, self.output_shape)
             return
 
-        self.W -= learning_rate * self.dW
-        self.b -= learning_rate * self.db
+        self.velocity = momentum * self.velocity + (1 - momentum) * self.dW
+        self.velocity_b = momentum * self.velocity_b + (1 - momentum) * self.db
+
+        self.W -= learning_rate * self.velocity
+        self.b -= learning_rate * self.velocity_b
 
         self.dW = np.zeros_like(self.W)
         self.db = np.zeros_like(self.b)

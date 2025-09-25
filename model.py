@@ -166,6 +166,6 @@ class Model:
 
         lines.append(f"  Loss: {type(self.loss).__name__}")
         lines.append(f"  Total parameters: {total_params:,}")
-        lines.append(f"  Device: {"GPU" if self._onGPU else "CPU"}")
+        lines.append(f"  Device: {'GPU' if self._onGPU else 'CPU'}")
         lines.append(")")
         return "\n".join(lines)

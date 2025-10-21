@@ -40,38 +40,38 @@ print("Labels shape:", y_train.shape)
 def main():
     BATCH_SIZE = 64
 
-    sequence = [
-        Conv2d((1, 28, 28), 5, 5),
-        ReLU(),
-        MaxPool(),
-        Flatten(),
-        # Linear(24 * 24 * 5, 128),
-        Linear(12 * 12 * 5, 128),
-        ReLU(),
-        Linear(128, 10),
-    ]
-
-    # sequence: Sequence = [
-    #     Linear(784, 512),
-    #     ReLU(512),
-    #     Linear(512, 512),
-    #     ReLU(512),
-    #     Linear(512, 512),
-    #     ReLU(512),
-    #     Linear(512, 10),
+    # sequence = [
+    #     Conv2d((1, 28, 28), 5, 5),
+    #     ReLU(),
+    #     MaxPool(),
+    #     Flatten(),
+    #     # Linear(24 * 24 * 5, 128),
+    #     Linear(12 * 12 * 5, 128),
+    #     ReLU(),
+    #     Linear(128, 10),
     # ]
+
+    sequence: Sequence = [
+        Linear(784, 512),
+        ReLU(512),
+        Linear(512, 512),
+        ReLU(512),
+        Linear(512, 512),
+        ReLU(512),
+        Linear(512, 10),
+    ]
 
     loss_fn = CrossEntropyLoss()  # MSELoss()
 
     model = Model(sequence, loss_fn)
     # model.load("mlp-weights.pkl")
     # model.toGPU(BATCH_SIZE)
-    # model(10, X_train, y_train, learning_rate=3e-2, batch_size=BATCH_SIZE)
-    model(5, cX_train, y_train, batch_size=512)
-    model.sequence[2].toGPU()  # send maxpool to gpu
+    model(10, X_train, y_train, learning_rate=3e-2, batch_size=BATCH_SIZE)
+    # model(5, cX_train, y_train, batch_size=512)
+    # model.sequence[2].toGPU()  # send maxpool to gpu
 
-    # acc = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
-    acc = model.evaluate(cX_test, y_test, batch_size=BATCH_SIZE)
+    acc = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
+    # acc = model.evaluate(cX_test, y_test, batch_size=BATCH_SIZE)
     print(f"Accuracy: {acc*100:.2f}%")
 
     if input("\nSave weights? (y/n) >>> ").lower() in ("y", "yes"):
